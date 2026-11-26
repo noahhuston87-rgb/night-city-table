@@ -1,0 +1,57 @@
+{
+  "name": "night-city-table",
+  "productName": "Night City Table",
+  "version": "1.0.0",
+  "description": "A free virtual tabletop for Cyberpunk 2020. The DM hosts, everyone else joins with a code.",
+  "main": "main.js",
+  "author": "Night City Table",
+  "homepage": "https://github.com/noahhuston87-rgb/night-city-table",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/copy-peerjs.js && electron .",
+    "dist": "node scripts/copy-peerjs.js && electron-builder --publish never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "36.9.5",
+    "electron-builder": "26.0.12",
+    "peerjs": "1.5.4"
+  },
+  "build": {
+    "appId": "com.nightcitytable.app",
+    "productName": "Night City Table",
+    "files": ["main.js", "preload.js", "app/**/*", "package.json"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "artifactName": "Night-City-Table-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Night City Table",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.role-playing-games",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "Night-City-Table-${version}-Mac.${ext}"
+    },
+    "dmg": { "title": "Night City Table" },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "category": "Game",
+      "artifactName": "Night-City-Table-${version}-Linux.${ext}"
+    }
+  }
+}
