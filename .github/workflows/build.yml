@@ -30,6 +30,14 @@ jobs:
         run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Check the Mac app is signed
+        if: runner.os == 'macOS'
+        run: |
+          hdiutil attach dist/*.dmg -mountpoint /tmp/nct -nobrowse
+          codesign --verify --deep --strict --verbose=2 "/tmp/nct/Night City Table.app"
+          codesign -dv "/tmp/nct/Night City Table.app" 2>&1 | grep -i "Signature=adhoc"
+          lipo -archs "/tmp/nct/Night City Table.app/Contents/MacOS/Night City Table"
+          hdiutil detach /tmp/nct
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}

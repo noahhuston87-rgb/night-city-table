@@ -21,10 +21,25 @@
   "build": {
     "appId": "com.nightcitytable.app",
     "productName": "Night City Table",
-    "files": ["main.js", "preload.js", "app/**/*", "package.json"],
-    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "artifactName": "Night-City-Table-Setup-${version}.${ext}"
     },
@@ -38,20 +53,37 @@
       "deleteAppDataOnUninstall": false
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.role-playing-games",
-      "identity": "-",
+      "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "artifactName": "Night-City-Table-${version}-Mac.${ext}"
     },
-    "dmg": { "title": "Night City Table" },
+    "dmg": {
+      "title": "Night City Table"
+    },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "category": "Game",
       "artifactName": "Night-City-Table-${version}-Linux.${ext}"
-    }
+    },
+    "afterPack": "scripts/adhoc-sign.js"
   }
 }
