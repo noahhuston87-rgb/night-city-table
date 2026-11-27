@@ -457,7 +457,9 @@
       ctx.stroke(); ctx.restore();
     }
     ctx.strokeStyle = TH.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 2 / v.z; ctx.strokeRect(0, 0, m.w, m.h); ctx.globalAlpha = 1;
+    if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'under');
     for (const t of visibleTokens(m)) drawToken(t, m, v);
+    if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'over');
     if (ruler) {
       ctx.save(); ctx.strokeStyle = TH.t; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
       ctx.beginPath(); ctx.moveTo(ruler.x1, ruler.y1); ctx.lineTo(ruler.x2, ruler.y2); ctx.stroke(); ctx.setLineDash([]);
@@ -474,6 +476,35 @@
       ctx.beginPath(); ctx.arc(p.x, p.y, (4 + k * 30) / v.z * Math.max(1, v.z), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
     }
     if (pings.length) requestAnimationFrame(draw);
+  }
+  // while dragging a token: line from where it started, distance in squares and metres, and its run range
+  function drawMoveRuler(t, m, v, layer) {
+    const g = m.grid.size, p = tokenPx(t, m);
+    let nx = drag.x, ny = drag.y; if (g >= 4) { nx = snap(nx, g, m.grid.ox); ny = snap(ny, g, m.grid.oy); }
+    const x1 = t.x + p / 2, y1 = t.y + p / 2, x2 = nx + p / 2, y2 = ny + p / 2;
+    const sq = Math.hypot(x2 - x1, y2 - y1) / g, metres = Math.round(sq * 2);
+    const sh = t.sheetId && S.sheets[t.sheetId]; const run = sh ? N.derived(sh).run : null;
+    const over = run !== null && metres > run;
+    ctx.save();
+    if (layer === 'under') {
+      if (run) { ctx.setLineDash([8 / v.z, 6 / v.z]); ctx.strokeStyle = TH.s; ctx.globalAlpha = 0.6; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(x1, y1, run / 2 * g, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 0.08; ctx.fillStyle = TH.s; ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = TH.p; ctx.lineWidth = 2 / v.z; ctx.setLineDash([4 / v.z, 4 / v.z]); ctx.strokeRect(nx, ny, p, p); // where it will land
+      ctx.restore(); return;
+    }
+    if (sq < 0.05) { ctx.restore(); return; }
+    const col = over ? '#ff3344' : TH.t;
+    ctx.strokeStyle = col; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x1, y1, 4 / v.z, 0, Math.PI * 2); ctx.fill();
+    const label = sq.toFixed(1) + ' sq · ' + metres + ' m' + (run !== null ? (over ? '  OVER RUN (' + run + ' m)' : '  / run ' + run + ' m') : '');
+    ctx.font = 'bold ' + (15 / v.z) + 'px "Share Tech Mono", monospace'; const tw = ctx.measureText(label).width;
+    let lx = x2 + p / 2 + 8 / v.z, ly = y2 - 10 / v.z;
+    if ((lx + tw + 8 / v.z) * v.z + v.x > W) lx = x2 - p / 2 - 12 / v.z - tw; // keep it on screen
+    if ((ly - 15 / v.z) * v.z + v.y < 0) ly = y2 + p / 2 + 22 / v.z;
+    ctx.fillStyle = '#000d'; ctx.fillRect(lx - 4 / v.z, ly - 15 / v.z, tw + 8 / v.z, 21 / v.z);
+    ctx.strokeStyle = col; ctx.lineWidth = 1 / v.z; ctx.strokeRect(lx - 4 / v.z, ly - 15 / v.z, tw + 8 / v.z, 21 / v.z);
+    ctx.fillStyle = col; ctx.fillText(label, lx, ly);
+    ctx.restore();
   }
   function drawToken(t, m, v) {
     const p = tokenPx(t, m); let x = t.x, y = t.y;
