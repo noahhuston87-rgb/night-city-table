@@ -126,8 +126,8 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.08em;text-transform
 #splitter{background:var(--line);cursor:col-resize}
 #splitter:hover{background:var(--p);box-shadow:0 0 10px var(--glow)}
 #side{background:#000;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
-#tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-#tabs button{flex:1;border:1px solid transparent;border-radius:0;background:transparent;padding:9px 4px;font-family:var(--display);font-size:.72rem;letter-spacing:.06em;color:var(--dim);min-width:58px}
+#tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));border-bottom:1px solid var(--line)}
+#tabs button{border:1px solid transparent;border-radius:0;background:transparent;padding:9px 2px;font-family:var(--display);font-size:.7rem;letter-spacing:.04em;color:var(--dim);white-space:nowrap}
 #tabs button::before{content:'◆ ';color:var(--s)}
 #tabs button.on{color:var(--p);border:2px solid var(--p);background:color-mix(in srgb,var(--p) 12%,transparent);box-shadow:inset 0 0 12px color-mix(in srgb,var(--p) 20%,transparent)}
 #tabs button.on::before{color:var(--p)}
@@ -255,6 +255,23 @@ table.wt input{width:100%;padding:2px 4px}
 .tile .tv{font-family:var(--display);font-size:1.5rem;font-weight:900;color:var(--p);text-shadow:0 0 calc(6px*var(--gl)) var(--glow);text-align:right}
 .tile .ts{font-size:.65rem;color:var(--dim);text-transform:uppercase}
 .sheet .skills{max-height:62vh}
+
+/* token size bar + ammo tracker */
+#tokenhud{position:absolute;left:10px;top:10px;background:#000d;border:2px solid var(--p);box-shadow:0 0 calc(12px*var(--gl)) var(--glow);padding:6px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 20px);font-size:.8rem;text-transform:uppercase}
+#tokenhud .tn{color:var(--p);font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tokenhud .sz{font-family:var(--display);font-size:1.05rem;color:var(--p);min-width:44px;text-align:center}
+#tokenhud input[type=range]{width:110px}
+#ammobar{border-top:1px solid var(--line);padding:6px 8px;max-height:30vh;overflow:auto}
+.ammo{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;padding:4px 0;border-bottom:1px dashed var(--line)}
+.ammo:last-child{border-bottom:0}
+.ammo .an{color:var(--p);font-weight:700;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:uppercase}
+.ammo .ac{font-family:var(--display);font-weight:900;color:var(--p);font-size:.95rem}
+.ammo .ac.low{color:var(--t)}.ammo .ac.empty{color:var(--red)}
+.ammo .rounds{grid-column:1/3;display:flex;gap:1px;flex-wrap:wrap}
+.ammo .rounds i{width:5px;height:9px;background:var(--p);box-shadow:0 0 3px var(--glow)}
+.ammo .rounds i.e{background:transparent;border:1px solid var(--line);box-shadow:none}
+.ammo .ab{grid-column:1/3;display:flex;gap:4px;flex-wrap:wrap}
+.ammo .ab button{padding:1px 7px;font-size:.72rem}
 
 /* settings */
 .stabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -384,6 +401,7 @@ table.wt input{width:100%;padding:2px 4px}
     <canvas id="canvas"></canvas>
     <div id="maphint"></div>
     <div id="nowplaying" class="hidden"></div>
+    <div id="tokenhud" class="hidden"></div>
     <div id="zoomctl"><button class="small" id="zoomOut">−</button><button class="small" id="zoomIn">+</button></div>
   </div>
   <div id="splitter" title="Drag to resize"></div>
@@ -399,6 +417,7 @@ table.wt input{width:100%;padding:2px 4px}
     </div>
     <div class="pane" id="pane-chat">
       <div id="chatlog"></div>
+      <div id="ammobar" class="hidden"></div>
       <div id="macrobar" class="hidden" style="border-top:1px solid var(--line);padding:6px 8px"></div>
       <div id="chatbox">
         <div id="quickdice">
@@ -771,7 +790,7 @@ function nctSiteHelper() {
     return state;
   }
   function newMap(name, img, w, h) {
-    return { id: uid(), name: str(name || 'Map', 80), img: img || '', w: w || 2000, h: h || 1400, grid: { size: 70, show: true, ox: 0, oy: 0, color: '#00f0ff', alpha: 0.25 }, tokens: {}, bg: '#0b0f1a' };
+    return { id: uid(), name: str(name || 'Map', 80), img: img || '', w: w || 2000, h: h || 1400, grid: { size: 70, show: true, ox: 0, oy: 0, color: '', alpha: 0.25 }, tokens: {}, bg: '#0b0f1a' };
   }
 
   const MAX_CHAT = 400;
@@ -820,7 +839,8 @@ function nctSiteHelper() {
     for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20), cyber: clamp(v.cyber || 0, -10, 10) }; }
     if (Array.isArray(s.skills)) out.skills = s.skills.slice(0, 300).map(k => ({ name: str(k.name, 60), stat: STATS.includes(k.stat) ? k.stat : '', value: clamp(k.value, 0, 20) }));
     for (const [k] of LOCS) out.sp[k] = clamp(s.sp && s.sp[k], 0, 100);
-    out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300) }));
+    out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300),
+      left: (w.left === undefined || w.left === null || w.left === '') ? (parseInt(w.shots, 10) || 0) : clamp(w.left, 0, 9999), mags: clamp(w.mags || 0, 0, 999) }));
     out.cyberware = (Array.isArray(s.cyberware) ? s.cyberware : []).slice(0, 100).map(c => ({ name: str(c.name, 80), hl: str(c.hl, 10), notes: str(c.notes, 400) }));
     out.gear = (Array.isArray(s.gear) ? s.gear : []).slice(0, 200).map(g => ({ name: str(g.name, 80), notes: str(g.notes, 400) }));
     if (Array.isArray(s.macros)) out.macros = s.macros.slice(0, 60).map(m => ({ id: str(m.id || uid(), 20), name: str(m.name || 'Macro', 40), formula: str(m.formula, 200), kind: ['hit', 'dmg'].includes(m.kind) ? m.kind : '' }));
@@ -1466,6 +1486,8 @@ window.peerReady = new Promise(function (resolve) {
     renderPeople();
     renderChat(full);
     renderMacroBar();
+    renderAmmoBar();
+    renderTokenHud();
     renderPane();
     draw();
   }
@@ -1610,7 +1632,7 @@ window.peerReady = new Promise(function (resolve) {
     const im = getImg(m.img); if (im) ctx.drawImage(im, 0, 0, m.w, m.h);
     const g = m.grid;
     if (g.show && g.size >= 4) {
-      ctx.save(); ctx.globalAlpha = g.alpha; ctx.strokeStyle = g.color; ctx.lineWidth = 1 / v.z; ctx.beginPath();
+      ctx.save(); ctx.globalAlpha = g.alpha; ctx.strokeStyle = g.color || TH.p; ctx.lineWidth = 1 / v.z; ctx.beginPath();
       const ox = ((g.ox % g.size) + g.size) % g.size, oy = ((g.oy % g.size) + g.size) % g.size;
       for (let x = ox; x <= m.w; x += g.size) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
       for (let y = oy; y <= m.h; y += g.size) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
@@ -1682,8 +1704,8 @@ window.peerReady = new Promise(function (resolve) {
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
     const t = hitToken(w.x, w.y);
-    if (t) { selected = t.id; if (canMoveToken(t)) drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y }; draw(); return; }
-    selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw();
+    if (t) { selected = t.id; if (canMoveToken(t)) drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y }; draw(); renderTokenHud(); return; }
+    selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw(); renderTokenHud();
   });
   cv.addEventListener('pointermove', e => {
     if (pan) { const v = view(); const dx = e.offsetX - pan.sx, dy = e.offsetY - pan.sy; if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true; v.x += dx; v.y += dy; pan.sx = e.offsetX; pan.sy = e.offsetY; draw(); return; }
@@ -1728,6 +1750,7 @@ window.peerReady = new Promise(function (resolve) {
     if (t.sheetId && S.sheets[t.sheetId]) items.push(['Open character sheet', () => openSheetModal(t.sheetId)]);
     if (canMoveToken(t)) {
       items.push(['Rename…', () => askText('Token name', t.name, n => upd({ name: n }))]);
+      items.push(['Size… (now ' + t.size + ')', () => openTokenSize(t)]);
       items.push(['Bigger', () => upd({ size: Math.min(10, t.size + (t.size < 1 ? 0.25 : 1)) })]);
       items.push(['Smaller', () => upd({ size: Math.max(0.25, t.size - (t.size <= 1 ? 0.25 : 1)) })]);
       items.push(['Change picture…', () => pickImage(256, url => upd({ img: url }))]);
@@ -1795,7 +1818,7 @@ window.peerReady = new Promise(function (resolve) {
       num('Grid shift left/right', m.grid.ox, -300, 300, v => up({ grid: { ox: v } })),
       num('Grid shift up/down', m.grid.oy, -300, 300, v => up({ grid: { oy: v } })),
       el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: m.grid.show, onchange: e => up({ grid: { show: e.target.checked } }) }), 'Show grid',
-        el('input', { type: 'color', value: m.grid.color, onchange: e => up({ grid: { color: e.target.value } }), style: 'width:40px;height:26px;padding:0;margin-left:auto' }),
+        el('input', { type: 'color', value: m.grid.color || TH.p, title: 'Grid colour', onchange: e => up({ grid: { color: e.target.value } }), style: 'width:40px;height:26px;padding:0;margin-left:auto' }),
         el('input', { type: 'range', min: 0.05, max: 1, step: 0.05, value: m.grid.alpha, onchange: e => up({ grid: { alpha: Number(e.target.value) } }), title: 'Grid opacity' })),
       m.img ? null : el('div', { class: 'row' }, num('Width (squares)', Math.round(m.w / m.grid.size), 2, 200, v => up({ w: v * m.grid.size })), num('Height', Math.round(m.h / m.grid.size), 2, 200, v => up({ h: v * m.grid.size }))),
       el('label', { class: 'row' }, el('span', { class: 'grow', text: 'Background colour' }), el('input', { type: 'color', value: m.bg || '#0b0f1a', onchange: e => up({ bg: e.target.value }), style: 'width:40px;height:26px;padding:0' })));
@@ -2007,17 +2030,17 @@ window.peerReady = new Promise(function (resolve) {
       ed ? el('div', { class: 'row', style: 'margin-top:6px' }, newSk, el('button', { class: 'small', text: '+ Add', onclick: () => { const n = newSk.value.trim(); if (!n) return; s.skills.push({ name: n, stat: N.SKILL_STAT[n.toLowerCase()] || 'INT', value: 1 }); s.skills.sort((a, b) => a.name.localeCompare(b.name)); saveSheetSoon(); renderSheetModal(false); } })) : null);
 
     // weapons
-    const wt = el('table', { class: 'wt' }, el('tr', null, ...['Weapon', 'Type', 'WA', 'Damage', 'ROF', 'Shots', 'Range', 'Skill', ''].map(h => el('th', { text: h }))));
+    const wt = el('table', { class: 'wt' }, el('tr', null, ...['Weapon', 'Type', 'WA', 'Damage', 'ROF', 'Mag', 'Left', 'Spare mags', 'Range', 'Skill', ''].map(h => el('th', { text: h }))));
     s.weapons.forEach((w, i) => {
       const skv = (s.skills.find(k => k.name.toLowerCase() === String(w.skill).toLowerCase()) || { value: 0 }).value;
       const atk = N.effStat(s, 'REF') + skv + (Number(w.wa) || 0);
       const cell = (k, attrs) => el('td', null, inp(w[k], v => { w[k] = v; }, attrs));
-      wt.appendChild(el('tr', null, cell('name'), cell('type'), cell('wa', { type: 'number', style: 'width:46px' }), cell('damage'), cell('rof', { style: 'width:40px' }), cell('shots', { style: 'width:44px' }), cell('range', { style: 'width:54px' }),
+      wt.appendChild(el('tr', null, cell('name'), cell('type'), cell('wa', { type: 'number', style: 'width:46px' }), cell('damage'), cell('rof', { style: 'width:40px' }), cell('shots', { style: 'width:44px', title: 'Rounds per magazine' }), cell('left', { type: 'number', style: 'width:50px', title: 'Rounds left' }), cell('mags', { type: 'number', style: 'width:50px', title: 'Spare magazines' }), cell('range', { style: 'width:54px' }),
         el('td', null, el('select', { disabled: !ed, onchange: change(v => { w.skill = v; }) }, ...['Handgun', 'Submachinegun', 'Rifle', 'Heavy Weapons', 'Melee', 'Fencing', 'Brawling', 'Martial Arts', 'Archery', 'Athletics'].map(k => el('option', { value: k, text: k, selected: k === w.skill })))),
         el('td', { style: 'white-space:nowrap' },
-          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles', onclick: () => rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
+          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles. Uses 1 round.', onclick: () => useAmmo(s, i, 1, true) && rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
           el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage + ', plus your switched-on damage toggles', onclick: () => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg', { ap: /\bAP\b/i.test(w.notes || '') }) }), ' ',
-          el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together', onclick: () => { rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
+          el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together. Uses 1 round.', onclick: () => { if (!useAmmo(s, i, 1, true)) return; rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
           ed ? el('button', { class: 'small ghost', text: '✕', onclick: () => { s.weapons.splice(i, 1); saveSheetSoon(); renderSheetModal(false); } }) : null)));
     });
     const weapBox = el('div', { class: 'box full' }, el('h3', { text: 'WEAPONS' }), s.weapons.length ? wt : el('div', { class: 'dim', text: 'No weapons.' }),
@@ -2756,6 +2779,81 @@ window.peerReady = new Promise(function (resolve) {
     q.oninput = draw; draw();
     m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q, el('button', { class: 'small', text: line === 'red' ? 'Switch to 2020' : 'Switch to RED', onclick: () => openQuickRef(line === 'red' ? '2020' : 'red') })), body,
       el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary written for Night City Table. For full rules, open your rulebook in the Books tab. Your DM\'s ruling always wins.' }));
+  }
+
+  // ================= TOKEN SIZE & AMMO TRACKER =================
+  const SIZE_PRESETS = [[0.5, '½'], [1, '1'], [2, '2'], [3, '3'], [4, '4']];
+  function setTokenSize(t, size) { const m = activeMap(); if (!m) return; size = Math.max(0.25, Math.min(10, Math.round(size * 4) / 4)); t.size = size; draw(); request({ type: 'token.update', mapId: m.id, id: t.id, patch: { size } }); }
+  function renderTokenHud() {
+    const hud = $('#tokenhud'); if (!hud) return;
+    const m = S && activeMap(); const t = m && selected && m.tokens[selected];
+    if (!t || !canMoveToken(t)) { hud.classList.add('hidden'); return; }
+    if (hud.contains(document.activeElement) && document.activeElement.type === 'range') return;
+    hud.classList.remove('hidden'); hud.textContent = '';
+    const sh = t.sheetId && S.sheets[t.sheetId];
+    hud.append(el('span', { class: 'tn', text: t.name || (sh && sh.name) || 'Token' }), el('span', { class: 'dim', text: 'Size' }),
+      el('button', { class: 'small', text: '−', title: 'Smaller', onclick: () => setTokenSize(t, t.size - (t.size <= 1 ? 0.25 : 1)) }),
+      el('span', { class: 'sz', text: (t.size % 1 ? t.size : t.size) + (t.size === 1 ? ' sq' : ' sq') }),
+      el('button', { class: 'small', text: '+', title: 'Bigger', onclick: () => setTokenSize(t, t.size + (t.size < 1 ? 0.25 : 1)) }),
+      el('input', { type: 'range', min: 0.25, max: 10, step: 0.25, value: t.size, title: 'Drag to resize', oninput: e => { t.size = Number(e.target.value); draw(); hud.querySelector('.sz').textContent = t.size + ' sq'; }, onchange: e => setTokenSize(t, Number(e.target.value)) }),
+      ...SIZE_PRESETS.map(([v, l]) => el('button', { class: 'small' + (t.size === v ? ' primary' : ' ghost'), text: l, title: v + ' square' + (v === 1 ? '' : 's') + ' wide', onclick: () => setTokenSize(t, v) })),
+      el('button', { class: 'small ghost', text: '✕', title: 'Deselect', onclick: () => { selected = null; draw(); renderTokenHud(); } }));
+  }
+  function openTokenSize(t) {
+    const m = modal('Token size: ' + (t.name || 'token'));
+    const val = el('div', { style: 'font-family:var(--display);font-size:2rem;color:var(--p);text-align:center', text: t.size + ' squares' });
+    const r = el('input', { type: 'range', min: 0.25, max: 10, step: 0.25, value: t.size, style: 'width:100%', oninput: e => { t.size = Number(e.target.value); val.textContent = t.size + ' squares'; draw(); } });
+    m.append(val, r, el('div', { class: 'row', style: 'flex-wrap:wrap;margin:10px 0' }, ...[[0.5, 'Tiny ½'], [1, 'Normal 1'], [2, 'Large 2'], [3, 'Huge 3'], [4, 'Vehicle 4'], [6, 'Big vehicle 6']].map(([v, l]) => el('button', { class: 'small', text: l, onclick: () => { r.value = v; r.oninput({ target: r }); } }))),
+      el('p', { class: 'dim', style: 'font-size:.8rem', text: 'Size is how many grid squares wide the token is. One square is about 2 metres.' }),
+      el('div', { class: 'row' }, el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Done', onclick: () => { setTokenSize(t, t.size); closeModal(); } })));
+  }
+
+  // ammo: rounds left in each gun, shown outside the sheet for your active character
+  const magSize = w => parseInt(w.shots, 10) || 0;
+  function ammoSheet() {
+    if (!S) return null;
+    const mine = Object.values(S.sheets).filter(x => canEditSheet(x)); if (!mine.length) return null;
+    let cur = S.sheets[LS.get('nct-active-sheet-' + S.id, '')]; if (!cur || !canEditSheet(cur)) cur = mine[0];
+    return cur;
+  }
+  function useAmmo(sh, wi, n, quiet) {
+    const s2 = N.clone(sh); const w = s2.weapons[wi]; if (!w || !magSize(w)) return true;
+    if (w.left <= 0) { toast('*Click* ' + (w.name || 'Weapon') + ' is empty. Reload!', true); return false; }
+    const used = Math.min(n, w.left); w.left -= used; request({ type: 'sheet.upsert', sheet: s2 });
+    if (!quiet && used < n) toast('Only ' + used + ' round' + (used === 1 ? '' : 's') + ' left to fire');
+    return true;
+  }
+  function reload(sh, wi) {
+    const s2 = N.clone(sh); const w = s2.weapons[wi]; if (!w) return;
+    if (w.mags > 0) w.mags -= 1; else toast('Reloaded (no spare magazines tracked)');
+    w.left = magSize(w); request({ type: 'sheet.upsert', sheet: s2 });
+  }
+  let ammoOpen = LS.get('nct-ammo-open', true);
+  function renderAmmoBar() {
+    const bar = $('#ammobar'); if (!bar) return;
+    const sh = ammoSheet(); const guns = sh ? sh.weapons.map((w, i) => [w, i]).filter(([w]) => magSize(w) > 0) : [];
+    if (!guns.length) { bar.classList.add('hidden'); return; }
+    if (bar.contains(document.activeElement) && document.activeElement.matches('input')) return;
+    bar.classList.remove('hidden'); bar.textContent = '';
+    bar.append(el('div', { class: 'row', style: 'cursor:pointer', onclick: () => { ammoOpen = !ammoOpen; LS.set('nct-ammo-open', ammoOpen); renderAmmoBar(); } },
+      el('span', { class: 'section-h grow', style: 'margin:0', text: (ammoOpen ? '▾ ' : '▸ ') + 'Ammo · ' + sh.name }),
+      ammoOpen ? null : el('span', { class: 'dim', style: 'font-size:.75rem', text: guns.map(([w]) => w.left + '/' + magSize(w)).join('  ') })));
+    if (!ammoOpen) return;
+    for (const [w, i] of guns) {
+      const max = magSize(w), left = Math.max(0, Math.min(w.left, max));
+      bar.append(el('div', { class: 'ammo' },
+        el('span', { class: 'an', text: w.name || 'Weapon', title: w.name }),
+        el('span', { class: 'ac' + (left === 0 ? ' empty' : left <= Math.ceil(max / 4) ? ' low' : ''), text: left + ' / ' + max + (w.mags ? '  +' + w.mags + ' mag' + (w.mags === 1 ? '' : 's') : '') }),
+        max <= 60 ? el('div', { class: 'rounds' }, ...Array.from({ length: max }, (_, k) => el('i', { class: k < left ? '' : 'e' }))) : null,
+        el('div', { class: 'ab' },
+          el('button', { class: 'small', text: '−1', title: 'Fire one round', onclick: () => useAmmo(sh, i, 1) }),
+          el('button', { class: 'small', text: '−3', title: 'Three-round burst', onclick: () => useAmmo(sh, i, 3) }),
+          el('button', { class: 'small', text: '−10', title: 'Full auto (10 rounds)', onclick: () => useAmmo(sh, i, 10) }),
+          el('button', { class: 'small ghost', text: '−?', title: 'Fire a chosen number of rounds', onclick: () => askText('How many rounds?', String(Number(w.rof) || 10), v => { const n = parseInt(v, 10); if (n > 0) useAmmo(sh, i, n); }) }),
+          el('button', { class: 'small primary', text: '⟳ Reload', onclick: () => reload(sh, i) }),
+          el('button', { class: 'small ghost', text: 'mags −', title: 'One fewer spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = Math.max(0, (s2.weapons[i].mags || 0) - 1); request({ type: 'sheet.upsert', sheet: s2 }); } }),
+          el('button', { class: 'small ghost', text: 'mags +', title: 'One more spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = (s2.weapons[i].mags || 0) + 1; request({ type: 'sheet.upsert', sheet: s2 }); } }))));
+    }
   }
 
   // ================= INSTALL AS AN APP =================

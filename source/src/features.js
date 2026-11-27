@@ -596,3 +596,78 @@
     m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q, el('button', { class: 'small', text: line === 'red' ? 'Switch to 2020' : 'Switch to RED', onclick: () => openQuickRef(line === 'red' ? '2020' : 'red') })), body,
       el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary written for Night City Table. For full rules, open your rulebook in the Books tab. Your DM\'s ruling always wins.' }));
   }
+
+  // ================= TOKEN SIZE & AMMO TRACKER =================
+  const SIZE_PRESETS = [[0.5, '½'], [1, '1'], [2, '2'], [3, '3'], [4, '4']];
+  function setTokenSize(t, size) { const m = activeMap(); if (!m) return; size = Math.max(0.25, Math.min(10, Math.round(size * 4) / 4)); t.size = size; draw(); request({ type: 'token.update', mapId: m.id, id: t.id, patch: { size } }); }
+  function renderTokenHud() {
+    const hud = $('#tokenhud'); if (!hud) return;
+    const m = S && activeMap(); const t = m && selected && m.tokens[selected];
+    if (!t || !canMoveToken(t)) { hud.classList.add('hidden'); return; }
+    if (hud.contains(document.activeElement) && document.activeElement.type === 'range') return;
+    hud.classList.remove('hidden'); hud.textContent = '';
+    const sh = t.sheetId && S.sheets[t.sheetId];
+    hud.append(el('span', { class: 'tn', text: t.name || (sh && sh.name) || 'Token' }), el('span', { class: 'dim', text: 'Size' }),
+      el('button', { class: 'small', text: '−', title: 'Smaller', onclick: () => setTokenSize(t, t.size - (t.size <= 1 ? 0.25 : 1)) }),
+      el('span', { class: 'sz', text: (t.size % 1 ? t.size : t.size) + (t.size === 1 ? ' sq' : ' sq') }),
+      el('button', { class: 'small', text: '+', title: 'Bigger', onclick: () => setTokenSize(t, t.size + (t.size < 1 ? 0.25 : 1)) }),
+      el('input', { type: 'range', min: 0.25, max: 10, step: 0.25, value: t.size, title: 'Drag to resize', oninput: e => { t.size = Number(e.target.value); draw(); hud.querySelector('.sz').textContent = t.size + ' sq'; }, onchange: e => setTokenSize(t, Number(e.target.value)) }),
+      ...SIZE_PRESETS.map(([v, l]) => el('button', { class: 'small' + (t.size === v ? ' primary' : ' ghost'), text: l, title: v + ' square' + (v === 1 ? '' : 's') + ' wide', onclick: () => setTokenSize(t, v) })),
+      el('button', { class: 'small ghost', text: '✕', title: 'Deselect', onclick: () => { selected = null; draw(); renderTokenHud(); } }));
+  }
+  function openTokenSize(t) {
+    const m = modal('Token size: ' + (t.name || 'token'));
+    const val = el('div', { style: 'font-family:var(--display);font-size:2rem;color:var(--p);text-align:center', text: t.size + ' squares' });
+    const r = el('input', { type: 'range', min: 0.25, max: 10, step: 0.25, value: t.size, style: 'width:100%', oninput: e => { t.size = Number(e.target.value); val.textContent = t.size + ' squares'; draw(); } });
+    m.append(val, r, el('div', { class: 'row', style: 'flex-wrap:wrap;margin:10px 0' }, ...[[0.5, 'Tiny ½'], [1, 'Normal 1'], [2, 'Large 2'], [3, 'Huge 3'], [4, 'Vehicle 4'], [6, 'Big vehicle 6']].map(([v, l]) => el('button', { class: 'small', text: l, onclick: () => { r.value = v; r.oninput({ target: r }); } }))),
+      el('p', { class: 'dim', style: 'font-size:.8rem', text: 'Size is how many grid squares wide the token is. One square is about 2 metres.' }),
+      el('div', { class: 'row' }, el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Done', onclick: () => { setTokenSize(t, t.size); closeModal(); } })));
+  }
+
+  // ammo: rounds left in each gun, shown outside the sheet for your active character
+  const magSize = w => parseInt(w.shots, 10) || 0;
+  function ammoSheet() {
+    if (!S) return null;
+    const mine = Object.values(S.sheets).filter(x => canEditSheet(x)); if (!mine.length) return null;
+    let cur = S.sheets[LS.get('nct-active-sheet-' + S.id, '')]; if (!cur || !canEditSheet(cur)) cur = mine[0];
+    return cur;
+  }
+  function useAmmo(sh, wi, n, quiet) {
+    const s2 = N.clone(sh); const w = s2.weapons[wi]; if (!w || !magSize(w)) return true;
+    if (w.left <= 0) { toast('*Click* ' + (w.name || 'Weapon') + ' is empty. Reload!', true); return false; }
+    const used = Math.min(n, w.left); w.left -= used; request({ type: 'sheet.upsert', sheet: s2 });
+    if (!quiet && used < n) toast('Only ' + used + ' round' + (used === 1 ? '' : 's') + ' left to fire');
+    return true;
+  }
+  function reload(sh, wi) {
+    const s2 = N.clone(sh); const w = s2.weapons[wi]; if (!w) return;
+    if (w.mags > 0) w.mags -= 1; else toast('Reloaded (no spare magazines tracked)');
+    w.left = magSize(w); request({ type: 'sheet.upsert', sheet: s2 });
+  }
+  let ammoOpen = LS.get('nct-ammo-open', true);
+  function renderAmmoBar() {
+    const bar = $('#ammobar'); if (!bar) return;
+    const sh = ammoSheet(); const guns = sh ? sh.weapons.map((w, i) => [w, i]).filter(([w]) => magSize(w) > 0) : [];
+    if (!guns.length) { bar.classList.add('hidden'); return; }
+    if (bar.contains(document.activeElement) && document.activeElement.matches('input')) return;
+    bar.classList.remove('hidden'); bar.textContent = '';
+    bar.append(el('div', { class: 'row', style: 'cursor:pointer', onclick: () => { ammoOpen = !ammoOpen; LS.set('nct-ammo-open', ammoOpen); renderAmmoBar(); } },
+      el('span', { class: 'section-h grow', style: 'margin:0', text: (ammoOpen ? '▾ ' : '▸ ') + 'Ammo · ' + sh.name }),
+      ammoOpen ? null : el('span', { class: 'dim', style: 'font-size:.75rem', text: guns.map(([w]) => w.left + '/' + magSize(w)).join('  ') })));
+    if (!ammoOpen) return;
+    for (const [w, i] of guns) {
+      const max = magSize(w), left = Math.max(0, Math.min(w.left, max));
+      bar.append(el('div', { class: 'ammo' },
+        el('span', { class: 'an', text: w.name || 'Weapon', title: w.name }),
+        el('span', { class: 'ac' + (left === 0 ? ' empty' : left <= Math.ceil(max / 4) ? ' low' : ''), text: left + ' / ' + max + (w.mags ? '  +' + w.mags + ' mag' + (w.mags === 1 ? '' : 's') : '') }),
+        max <= 60 ? el('div', { class: 'rounds' }, ...Array.from({ length: max }, (_, k) => el('i', { class: k < left ? '' : 'e' }))) : null,
+        el('div', { class: 'ab' },
+          el('button', { class: 'small', text: '−1', title: 'Fire one round', onclick: () => useAmmo(sh, i, 1) }),
+          el('button', { class: 'small', text: '−3', title: 'Three-round burst', onclick: () => useAmmo(sh, i, 3) }),
+          el('button', { class: 'small', text: '−10', title: 'Full auto (10 rounds)', onclick: () => useAmmo(sh, i, 10) }),
+          el('button', { class: 'small ghost', text: '−?', title: 'Fire a chosen number of rounds', onclick: () => askText('How many rounds?', String(Number(w.rof) || 10), v => { const n = parseInt(v, 10); if (n > 0) useAmmo(sh, i, n); }) }),
+          el('button', { class: 'small primary', text: '⟳ Reload', onclick: () => reload(sh, i) }),
+          el('button', { class: 'small ghost', text: 'mags −', title: 'One fewer spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = Math.max(0, (s2.weapons[i].mags || 0) - 1); request({ type: 'sheet.upsert', sheet: s2 }); } }),
+          el('button', { class: 'small ghost', text: 'mags +', title: 'One more spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = (s2.weapons[i].mags || 0) + 1; request({ type: 'sheet.upsert', sheet: s2 }); } }))));
+    }
+  }

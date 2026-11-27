@@ -304,6 +304,8 @@
     renderPeople();
     renderChat(full);
     renderMacroBar();
+    renderAmmoBar();
+    renderTokenHud();
     renderPane();
     draw();
   }
@@ -448,7 +450,7 @@
     const im = getImg(m.img); if (im) ctx.drawImage(im, 0, 0, m.w, m.h);
     const g = m.grid;
     if (g.show && g.size >= 4) {
-      ctx.save(); ctx.globalAlpha = g.alpha; ctx.strokeStyle = g.color; ctx.lineWidth = 1 / v.z; ctx.beginPath();
+      ctx.save(); ctx.globalAlpha = g.alpha; ctx.strokeStyle = g.color || TH.p; ctx.lineWidth = 1 / v.z; ctx.beginPath();
       const ox = ((g.ox % g.size) + g.size) % g.size, oy = ((g.oy % g.size) + g.size) % g.size;
       for (let x = ox; x <= m.w; x += g.size) { ctx.moveTo(x, 0); ctx.lineTo(x, m.h); }
       for (let y = oy; y <= m.h; y += g.size) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
@@ -520,8 +522,8 @@
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
     const t = hitToken(w.x, w.y);
-    if (t) { selected = t.id; if (canMoveToken(t)) drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y }; draw(); return; }
-    selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw();
+    if (t) { selected = t.id; if (canMoveToken(t)) drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y }; draw(); renderTokenHud(); return; }
+    selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw(); renderTokenHud();
   });
   cv.addEventListener('pointermove', e => {
     if (pan) { const v = view(); const dx = e.offsetX - pan.sx, dy = e.offsetY - pan.sy; if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true; v.x += dx; v.y += dy; pan.sx = e.offsetX; pan.sy = e.offsetY; draw(); return; }
@@ -566,6 +568,7 @@
     if (t.sheetId && S.sheets[t.sheetId]) items.push(['Open character sheet', () => openSheetModal(t.sheetId)]);
     if (canMoveToken(t)) {
       items.push(['Rename…', () => askText('Token name', t.name, n => upd({ name: n }))]);
+      items.push(['Size… (now ' + t.size + ')', () => openTokenSize(t)]);
       items.push(['Bigger', () => upd({ size: Math.min(10, t.size + (t.size < 1 ? 0.25 : 1)) })]);
       items.push(['Smaller', () => upd({ size: Math.max(0.25, t.size - (t.size <= 1 ? 0.25 : 1)) })]);
       items.push(['Change picture…', () => pickImage(256, url => upd({ img: url }))]);
@@ -633,7 +636,7 @@
       num('Grid shift left/right', m.grid.ox, -300, 300, v => up({ grid: { ox: v } })),
       num('Grid shift up/down', m.grid.oy, -300, 300, v => up({ grid: { oy: v } })),
       el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: m.grid.show, onchange: e => up({ grid: { show: e.target.checked } }) }), 'Show grid',
-        el('input', { type: 'color', value: m.grid.color, onchange: e => up({ grid: { color: e.target.value } }), style: 'width:40px;height:26px;padding:0;margin-left:auto' }),
+        el('input', { type: 'color', value: m.grid.color || TH.p, title: 'Grid colour', onchange: e => up({ grid: { color: e.target.value } }), style: 'width:40px;height:26px;padding:0;margin-left:auto' }),
         el('input', { type: 'range', min: 0.05, max: 1, step: 0.05, value: m.grid.alpha, onchange: e => up({ grid: { alpha: Number(e.target.value) } }), title: 'Grid opacity' })),
       m.img ? null : el('div', { class: 'row' }, num('Width (squares)', Math.round(m.w / m.grid.size), 2, 200, v => up({ w: v * m.grid.size })), num('Height', Math.round(m.h / m.grid.size), 2, 200, v => up({ h: v * m.grid.size }))),
       el('label', { class: 'row' }, el('span', { class: 'grow', text: 'Background colour' }), el('input', { type: 'color', value: m.bg || '#0b0f1a', onchange: e => up({ bg: e.target.value }), style: 'width:40px;height:26px;padding:0' })));
@@ -845,17 +848,17 @@
       ed ? el('div', { class: 'row', style: 'margin-top:6px' }, newSk, el('button', { class: 'small', text: '+ Add', onclick: () => { const n = newSk.value.trim(); if (!n) return; s.skills.push({ name: n, stat: N.SKILL_STAT[n.toLowerCase()] || 'INT', value: 1 }); s.skills.sort((a, b) => a.name.localeCompare(b.name)); saveSheetSoon(); renderSheetModal(false); } })) : null);
 
     // weapons
-    const wt = el('table', { class: 'wt' }, el('tr', null, ...['Weapon', 'Type', 'WA', 'Damage', 'ROF', 'Shots', 'Range', 'Skill', ''].map(h => el('th', { text: h }))));
+    const wt = el('table', { class: 'wt' }, el('tr', null, ...['Weapon', 'Type', 'WA', 'Damage', 'ROF', 'Mag', 'Left', 'Spare mags', 'Range', 'Skill', ''].map(h => el('th', { text: h }))));
     s.weapons.forEach((w, i) => {
       const skv = (s.skills.find(k => k.name.toLowerCase() === String(w.skill).toLowerCase()) || { value: 0 }).value;
       const atk = N.effStat(s, 'REF') + skv + (Number(w.wa) || 0);
       const cell = (k, attrs) => el('td', null, inp(w[k], v => { w[k] = v; }, attrs));
-      wt.appendChild(el('tr', null, cell('name'), cell('type'), cell('wa', { type: 'number', style: 'width:46px' }), cell('damage'), cell('rof', { style: 'width:40px' }), cell('shots', { style: 'width:44px' }), cell('range', { style: 'width:54px' }),
+      wt.appendChild(el('tr', null, cell('name'), cell('type'), cell('wa', { type: 'number', style: 'width:46px' }), cell('damage'), cell('rof', { style: 'width:40px' }), cell('shots', { style: 'width:44px', title: 'Rounds per magazine' }), cell('left', { type: 'number', style: 'width:50px', title: 'Rounds left' }), cell('mags', { type: 'number', style: 'width:50px', title: 'Spare magazines' }), cell('range', { style: 'width:54px' }),
         el('td', null, el('select', { disabled: !ed, onchange: change(v => { w.skill = v; }) }, ...['Handgun', 'Submachinegun', 'Rifle', 'Heavy Weapons', 'Melee', 'Fencing', 'Brawling', 'Martial Arts', 'Archery', 'Athletics'].map(k => el('option', { value: k, text: k, selected: k === w.skill })))),
         el('td', { style: 'white-space:nowrap' },
-          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles', onclick: () => rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
+          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles. Uses 1 round.', onclick: () => useAmmo(s, i, 1, true) && rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
           el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage + ', plus your switched-on damage toggles', onclick: () => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg', { ap: /\bAP\b/i.test(w.notes || '') }) }), ' ',
-          el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together', onclick: () => { rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
+          el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together. Uses 1 round.', onclick: () => { if (!useAmmo(s, i, 1, true)) return; rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
           ed ? el('button', { class: 'small ghost', text: '✕', onclick: () => { s.weapons.splice(i, 1); saveSheetSoon(); renderSheetModal(false); } }) : null)));
     });
     const weapBox = el('div', { class: 'box full' }, el('h3', { text: 'WEAPONS' }), s.weapons.length ? wt : el('div', { class: 'dim', text: 'No weapons.' }),

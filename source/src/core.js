@@ -183,7 +183,7 @@
     return state;
   }
   function newMap(name, img, w, h) {
-    return { id: uid(), name: str(name || 'Map', 80), img: img || '', w: w || 2000, h: h || 1400, grid: { size: 70, show: true, ox: 0, oy: 0, color: '#00f0ff', alpha: 0.25 }, tokens: {}, bg: '#0b0f1a' };
+    return { id: uid(), name: str(name || 'Map', 80), img: img || '', w: w || 2000, h: h || 1400, grid: { size: 70, show: true, ox: 0, oy: 0, color: '', alpha: 0.25 }, tokens: {}, bg: '#0b0f1a' };
   }
 
   const MAX_CHAT = 400;
@@ -232,7 +232,8 @@
     for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20), cyber: clamp(v.cyber || 0, -10, 10) }; }
     if (Array.isArray(s.skills)) out.skills = s.skills.slice(0, 300).map(k => ({ name: str(k.name, 60), stat: STATS.includes(k.stat) ? k.stat : '', value: clamp(k.value, 0, 20) }));
     for (const [k] of LOCS) out.sp[k] = clamp(s.sp && s.sp[k], 0, 100);
-    out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300) }));
+    out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300),
+      left: (w.left === undefined || w.left === null || w.left === '') ? (parseInt(w.shots, 10) || 0) : clamp(w.left, 0, 9999), mags: clamp(w.mags || 0, 0, 999) }));
     out.cyberware = (Array.isArray(s.cyberware) ? s.cyberware : []).slice(0, 100).map(c => ({ name: str(c.name, 80), hl: str(c.hl, 10), notes: str(c.notes, 400) }));
     out.gear = (Array.isArray(s.gear) ? s.gear : []).slice(0, 200).map(g => ({ name: str(g.name, 80), notes: str(g.notes, 400) }));
     if (Array.isArray(s.macros)) out.macros = s.macros.slice(0, 60).map(m => ({ id: str(m.id || uid(), 20), name: str(m.name || 'Macro', 40), formula: str(m.formula, 200), kind: ['hit', 'dmg'].includes(m.kind) ? m.kind : '' }));
