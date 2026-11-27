@@ -26,4 +26,8 @@ These warnings show up because the app isn't signed by a paid developer account.
 
 ## Updating
 
-When a new version is out, the app shows an **Update available** banner on its home screen. Download it and install it over the old one. Your games are kept.
+When a new version is out, the app shows an **Update available** banner on its home screen. On Windows and Mac, click **Update now**: it downloads, installs and reopens by itself. On Linux, download the new file. Your games are kept.
+
+## For whoever changes the game
+
+The game is the web page in `app/`. The Windows and Mac app is written in Rust (Tauri, in `src-tauri/`). The Linux app uses Electron (`main.js`). Every push to `main` builds new installers and publishes them as the latest release, and everyone's app then offers the update.

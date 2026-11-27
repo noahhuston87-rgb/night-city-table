@@ -845,7 +845,7 @@ function nctGrab(APP) {
 <script>
 /* Loads PeerJS (peer-to-peer connections) from a CDN, with a fallback. */
 window.peerReady = new Promise(function (resolve) {
-  var urls = (location.protocol === 'app:' ? ['peerjs.min.js'] : []).concat(['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js']);
+  var urls = ((location.protocol === 'app:' || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost') ? ['peerjs.min.js'] : []).concat(['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js']);
   function next(i) {
     if (window.Peer) return resolve(true);
     if (i >= urls.length) return resolve(false);
@@ -889,8 +889,8 @@ window.peerReady = new Promise(function (resolve) {
   // ---------- identity ----------
   const me = { id: LS.get('nct-id', null), name: LS.get('nct-name', ''), color: LS.get('nct-color', '#05d9e8') };
   if (!me.id) { me.id = 'u' + N.uid(12); LS.set('nct-id', me.id); }
-  const ONLINE = /^https?:$/.test(location.protocol);
   const DESKTOP = !!window.nctDesktop; // running inside the installed desktop app
+  const ONLINE = !DESKTOP && /^https?:$/.test(location.protocol);
   const APP_URL = ONLINE ? location.origin + location.pathname : '';
   const PEER_PREFIX = 'nctable-v1-';
 
@@ -1001,7 +1001,7 @@ window.peerReady = new Promise(function (resolve) {
   }
   let saveTimer = null;
   function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700); }
-  function saveNow() { if (role !== 'host' || !S) return; clearTimeout(saveTimer); S.updatedAt = Date.now(); DB.put(N.clone(S)).catch(e => toast('Could not save the game: ' + e.message, true)); }
+  function saveNow() { if (role !== 'host' || !S) return Promise.resolve(); clearTimeout(saveTimer); S.updatedAt = Date.now(); return DB.put(N.clone(S)).catch(e => toast('Could not save the game: ' + e.message, true)); }
 
   // ================= JOINING (players) =================
   async function joinGame(code) {
@@ -1098,7 +1098,7 @@ window.peerReady = new Promise(function (resolve) {
         el('div', { class: 'grow' }, el('div', { class: 'name', text: g.name }), el('div', { class: 'meta', text: 'Code ' + g.id + ' · ' + Object.keys(g.players || {}).length + ' people · ' + ago(g.lastPlayed || g.updatedAt || g.createdAt) })),
         el('button', { class: 'small primary', text: 'Open', onclick: () => { if (!needName()) hostGame(g); } }),
         el('button', { class: 'small ghost', title: 'Download backup', text: '⤓', onclick: () => downloadJSON(g, 'night-city-table-' + g.name.replace(/[^\w-]+/g, '_') + '.json') }),
-        el('button', { class: 'small ghost danger', title: 'Delete', text: '✕', onclick: async () => { if (confirm('Delete "' + g.name + '" forever? (Download a backup first if unsure.)')) { await DB.del(g.id); renderMyGames(); } } })
+        el('button', { class: 'small ghost danger', title: 'Delete', text: '✕', onclick: () => askConfirm('Delete "' + g.name + '" forever?', 'Download a backup first if you\'re not sure. This can\'t be undone.', 'Delete', async () => { await DB.del(g.id); renderMyGames(); }) })
       ));
     }
   }
@@ -1173,7 +1173,7 @@ window.peerReady = new Promise(function (resolve) {
       box.appendChild(el('span', { class: 'chip', style: 'border-color:' + p.color }, el('span', { class: 'dot ' + (on ? 'on' : 'off') }), (id === S.gmId ? '★ ' : '') + p.name + (id === me.id ? ' (you)' : '')));
     }
   }
-  $('#leaveBtn').onclick = () => { if (role === 'host' && net.conns.size && !confirm('Leave? Your players will be disconnected until you open the game again.')) return; leave(); };
+  $('#leaveBtn').onclick = () => { if (role === 'host' && net.conns.size) askConfirm('Leave the game?', 'Your players will be disconnected until you open the game again. Your game is saved.', 'Leave', leave); else leave(); };
   $('#backupBtn').onclick = () => { saveNow(); downloadJSON(S, 'night-city-table-' + S.name.replace(/[^\w-]+/g, '_') + '.json'); };
   $('#inviteBtn').onclick = () => {
     const link = APP_URL ? APP_URL + '#join=' + S.id : '';
@@ -1197,6 +1197,12 @@ window.peerReady = new Promise(function (resolve) {
   function copyText(t) {
     if (DESKTOP) { window.nctDesktop.writeClipboard(t); toast('Copied!'); return; }
     (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copied!'), () => { const m = modal('Copy this'); const ta = el('textarea', { style: 'width:100%;height:90px', value: t, readonly: true }); m.append(ta); ta.select(); });
+  }
+  function askConfirm(title, detail, yesLabel, onYes) {
+    const m = modal(title);
+    m.append(el('p', { class: 'dim', text: detail || '' }), el('div', { class: 'row' }, el('div', { class: 'grow' }),
+      el('button', { class: 'ghost', text: 'Cancel', onclick: closeModal }),
+      el('button', { class: 'pink', text: yesLabel || 'OK', onclick: () => { closeModal(); onYes(); } })));
   }
   function askText(title, value, cb) {
     const m = modal(title); const inp = el('input', { class: 'grow', value: value || '' });
@@ -1457,7 +1463,7 @@ window.peerReady = new Promise(function (resolve) {
       box.append(el('div', { class: 'item' + (act ? ' active' : '') },
         el('div', { class: 'grow' }, el('div', { text: m.name, style: 'font-weight:700' }), el('div', { class: 'dim', style: 'font-size:13px', text: Object.keys(m.tokens).length + ' tokens' })),
         act ? el('span', { class: 'badge b-ok', text: 'LIVE' }) : el('button', { class: 'small', text: 'Show to players', onclick: () => request({ type: 'map.activate', id: m.id }) }),
-        el('button', { class: 'small ghost danger', text: '✕', title: 'Delete map', onclick: () => { if (confirm('Delete map "' + m.name + '" and its tokens?')) request({ type: 'map.delete', id: m.id }); } })));
+        el('button', { class: 'small ghost danger', text: '✕', title: 'Delete map', onclick: () => askConfirm('Delete map "' + m.name + '"?', 'Its tokens are deleted too.', 'Delete', () => request({ type: 'map.delete', id: m.id })) })));
     }
     const m = activeMap(); if (!m) return;
     const up = patch => request({ type: 'map.update', id: m.id, patch });
@@ -1683,7 +1689,7 @@ window.peerReady = new Promise(function (resolve) {
     const notes = el('div', { class: 'box full' }, el('h3', { text: 'NOTES · LIFEPATH · CONTACTS' }), el('textarea', { disabled: !ed, style: 'width:100%;min-height:120px', value: s.notes, onchange: change(v => { s.notes = v; }, false) }));
     const foot = el('div', { class: 'row full' }, el('div', { class: 'grow' }),
       ed ? el('button', { class: 'ghost', text: 'Download sheet', onclick: () => downloadJSON(s, s.name.replace(/[^\w-]+/g, '_') + '.nct-character.json') }) : null,
-      ed ? el('button', { class: 'ghost danger', text: 'Delete character', onclick: () => { if (confirm('Delete ' + s.name + '?')) { request({ type: 'sheet.delete', id: s.id }); closeModal(); } } }) : null,
+      ed ? el('button', { class: 'ghost danger', text: 'Delete character', onclick: () => askConfirm('Delete ' + s.name + '?', 'This character sheet is removed for everyone.', 'Delete', () => request({ type: 'sheet.delete', id: s.id })) }) : null,
       el('button', { class: 'primary', text: 'Done', onclick: closeModal }));
     m.appendChild(el('div', { class: 'sheet' }, head, statBox, deriv, skillBox, el('div', { class: 'col' }, cyberBox, gearBox), weapBox, notes, foot));
     openSheet = s;
@@ -1794,7 +1800,7 @@ window.peerReady = new Promise(function (resolve) {
     const bar = $('#installBar'); if (!bar) return;
     if (DESKTOP) {
       const u = window.nctDesktop.getUpdate();
-      if (u && u.available) { bar.classList.remove('hidden'); $('#installBar b').textContent = 'Update available: version ' + u.version; $('#installSub').textContent = "You have version " + window.nctDesktop.version + ". Download the new one and install it over this one. Your games are kept."; $('#installBtn').textContent = 'Download update'; }
+      if (u && u.available) { bar.classList.remove('hidden'); $('#installBar b').textContent = 'Update available: version ' + u.version; $('#installSub').textContent = "You have version " + window.nctDesktop.version + ". Download the new one and install it over this one. Your games are kept."; $('#installBtn').textContent = window.nctDesktop.canAutoUpdate ? 'Update now' : 'Download update'; if (window.nctDesktop.canAutoUpdate) $('#installSub').textContent = 'You have version ' + window.nctDesktop.version + '. One click and it updates and reopens. Your games are kept.'; }
       else bar.classList.add('hidden');
       return;
     }
@@ -1805,7 +1811,7 @@ window.peerReady = new Promise(function (resolve) {
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; updateInstallBar(); });
   window.addEventListener('appinstalled', () => { installEvt = null; LS.set('nct-installed', true); updateInstallBar(); toast('Installed! Open Night City Table from your desktop or Start menu / Applications.'); });
   $('#installBtn').onclick = async () => {
-    if (DESKTOP) { window.nctDesktop.openExternal(window.nctDesktop.getUpdate().url); return; }
+    if (DESKTOP) { if (window.nctDesktop.canAutoUpdate) startUpdate(); else window.nctDesktop.openExternal(window.nctDesktop.getUpdate().url); return; }
     if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice; if (r && r.outcome === 'accepted') { LS.set('nct-installed', true); } installEvt = null; updateInstallBar(); return; }
     const ua = navigator.userAgent; const m = modal('Install Night City Table');
     const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1819,8 +1825,33 @@ window.peerReady = new Promise(function (resolve) {
       el('p', { class: 'dim', text: "Once it's installed, open it like any other app. Your games are kept, and it updates itself whenever the online version changes." }),
       el('div', { class: 'row' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Already installed, hide this', onclick: () => { LS.set('nct-installed', true); updateInstallBar(); closeModal(); } })));
   };
+  function startUpdate() {
+    const go = () => saveNow().then(() => {
+      if (role === 'host' && S) LS.set('nct-resume-host', { id: S.id, at: Date.now() });
+      const m = modal('Updating Night City Table');
+      const bar = el('div', { style: 'height:10px;background:var(--cyan);width:0%;box-shadow:0 0 10px var(--cyan);transition:width .2s' });
+      const txt = el('p', { class: 'dim', text: 'Downloading the new version…' });
+      m.append(txt, el('div', { style: 'background:#0a0f1c;border:1px solid var(--line);border-radius:4px;overflow:hidden' }, bar),
+        el('p', { class: 'dim', style: 'font-size:14px', text: 'The app closes, installs the update and opens again by itself. Your games are kept.' }));
+      $('#overlay .x').remove();
+      window.nctDesktop.installUpdate(p => { bar.style.width = p + '%'; txt.textContent = p >= 100 ? 'Installing… the app will reopen in a moment.' : 'Downloading the new version… ' + p + '%'; })
+        .catch(err => {
+          closeModal();
+          const f = modal("The update didn't finish");
+          f.append(el('p', { class: 'dim', text: (err && err.message ? err.message + '. ' : '') + 'You can download it yourself instead. Your games are safe.' }),
+            el('div', { class: 'row' }, el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Open download page', onclick: () => { window.nctDesktop.openExternal(window.nctDesktop.getUpdate().url); closeModal(); } })));
+        });
+    });
+    if (role === 'host' && net.conns.size) askConfirm('Update now?', 'The app restarts to update, so your players will be disconnected for about a minute. Your game reopens by itself and they reconnect automatically.', 'Update now', go);
+    else go();
+  }
   if (DESKTOP) {
-    window.nctDesktop.onUpdate(() => updateInstallBar());
+    window.nctDesktop.onUpdate(() => { updateInstallBar(); if (S) toast('A new version of Night City Table is available. Update from the home screen.'); });
+    if (window.nctDesktop.onCloseRequested) window.nctDesktop.onCloseRequested(() => { // the window's close button (Rust app)
+      const close = () => saveNow().then(() => window.nctDesktop.closeNow());
+      if (role === 'host' && net.conns.size) askConfirm('Close Night City Table?', 'Players are connected to your game. They will be disconnected until you open it again. Your game is saved.', 'Close anyway', close);
+      else close();
+    });
     let lastClip = '';
     window.addEventListener('focus', async () => { // character copied by the bookmark button → offer it
       try { const t = await window.nctDesktop.readClipboard(); if (!t || !t.startsWith('NCT1:')) return; let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; h = String(h) + ':' + t.length; if (h === lastClip || h === LS.get('nct-last-clip', '')) return; lastClip = h; LS.set('nct-last-clip', h); handleIncomingCharacter(JSON.parse(t.slice(5))); } catch (e) { }
@@ -1837,6 +1868,7 @@ window.peerReady = new Promise(function (resolve) {
     const j = h.match(/join=([A-Za-z0-9]+)/), ho = h.match(/host=([A-Za-z0-9]+)/);
     if (j) { $('#joinCode').value = j[1]; if (me.name) joinGame(j[1]); else { toast("Type your name, then press 'Join game'"); $('#myName').focus(); } }
     else if (ho) DB.get(ho[1]).then(g => { if (g && me.name) hostGame(g); }).catch(() => { });
+    else { const r = LS.get('nct-resume-host', null); LS.del('nct-resume-host'); if (r && Date.now() - r.at < 15 * 60e3) DB.get(r.id).then(g => { if (g && me.name) { hostGame(g); toast('Updated! Your game is open again.'); } }).catch(() => { }); }
   }
   start();
 })();
