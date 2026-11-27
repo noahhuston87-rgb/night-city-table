@@ -386,6 +386,7 @@
     if (nearBottom || full) log.scrollTop = log.scrollHeight;
   }
   function msgEl(m) {
+    if (m.combat) return combatMsgEl(m);
     const d = el('div', { class: 'msg' + (m.private ? ' priv' : ''), style: '--c:' + playerColor(m.from) },
       el('span', { class: 'when', text: timeStr(m.ts) }), el('div', { class: 'who', text: m.name || playerName(m.from) }));
     if (m.roll) {
@@ -460,6 +461,7 @@
     if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'under');
     for (const t of visibleTokens(m)) drawToken(t, m, v);
     if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'over');
+    drawTargeting(m, v);
     if (ruler) {
       ctx.save(); ctx.strokeStyle = TH.t; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
       ctx.beginPath(); ctx.moveTo(ruler.x1, ruler.y1); ctx.lineTo(ruler.x2, ruler.y2); ctx.stroke(); ctx.setLineDash([]);
@@ -560,6 +562,7 @@
     if (e.button === 1 || e.button === 2) { pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: e.button }; if (e.button === 2) ctxDown = { x: e.clientX, y: e.clientY, w }; return; }
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
+    if (tool === 'target') { const tt = hitToken(w.x, w.y); setTarget(tt && (!myTokenOnMap() || tt.id !== myTokenOnMap().id) ? tt : null); return; }
     const t = hitToken(w.x, w.y);
     if (t) {
       selected = t.id;
@@ -576,7 +579,7 @@
     const w = toWorld(e.offsetX, e.offsetY);
     if (drag) { drag.x = w.x - drag.dx; drag.y = w.y - drag.dy; draw(); return; }
     if (ruler && ruler.active) { ruler.x2 = w.x; ruler.y2 = w.y; draw(); }
-    const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
+    const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' || tool === 'target' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
   });
   cv.addEventListener('pointerup', e => {
     const m = activeMap();
@@ -612,9 +615,11 @@
   // token context menu
   function closeCtx() { const c = $('#ctx'); if (c) c.remove(); }
   function openCtx(t, x, y) {
-    closeCtx(); if (!canMoveToken(t) && !(t.sheetId && S.sheets[t.sheetId])) return;
+    closeCtx();
     const m = activeMap(); const upd = patch => request({ type: 'token.update', mapId: m.id, id: t.id, patch });
     const items = [];
+    const mine = myTokenOnMap();
+    if (!mine || mine.id !== t.id) { items.push([targetId === t.id ? '🎯 Clear target' : '🎯 Target', () => setTarget(targetId === t.id ? null : t)]); if (mine) items.push(['🎯 Attack this…', () => { setTarget(t); openAttack(); }]); }
     if (t.sheetId && S.sheets[t.sheetId]) items.push(['Open character sheet', () => openSheetModal(t.sheetId)]);
     if (canMoveToken(t)) {
       items.push(['Rename…', () => askText('Token name', t.name, n => upd({ name: n }))]);
@@ -629,6 +634,7 @@
       items.push(['Link to a character…', () => linkTokenDialog(t)]);
     }
     if (canMoveToken(t)) items.push(['Delete token', () => request({ type: 'token.delete', mapId: m.id, id: t.id })]);
+    if (!items.length) return;
     const box = el('div', { id: 'ctx', style: 'left:' + Math.min(x, innerWidth - 190) + 'px;top:' + Math.min(y, innerHeight - items.length * 34 - 10) + 'px' });
     for (const [label, fn] of items) box.appendChild(el('button', { text: label, onclick: () => { closeCtx(); fn(); } }));
     document.body.appendChild(box);
@@ -925,6 +931,7 @@
         el('td', { style: 'white-space:nowrap' },
           el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles. Uses 1 round.', onclick: () => useAmmo(s, i, 1, true) && rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
           el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage + ', plus your switched-on damage toggles', onclick: () => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg', { ap: /\bAP\b/i.test(w.notes || '') }) }), ' ',
+          el('button', { class: 'small pink', text: '🎯', title: 'Attack your target with this weapon (range, hit and damage worked out for you)', onclick: () => { closeModal(); openAttack(i); } }), ' ',
           el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together. Uses 1 round.', onclick: () => { if (!useAmmo(s, i, 1, true)) return; rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
           ed ? el('button', { class: 'small ghost', text: '✕', onclick: () => { s.weapons.splice(i, 1); saveSheetSoon(); renderSheetModal(false); } }) : null)));
     });

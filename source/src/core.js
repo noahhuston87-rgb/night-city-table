@@ -74,7 +74,10 @@
     { name: 'Aiming', value: '+1', applies: 'hit' }, { name: 'Smartgun link', value: '+2', applies: 'hit' }, { name: 'Laser sight', value: '+1', applies: 'hit' },
     { name: 'Target immobile', value: '+4', applies: 'hit' }, { name: 'Ambush', value: '+5', applies: 'hit' }, { name: 'Running', value: '-3', applies: 'hit' },
     { name: 'Fast draw', value: '-3', applies: 'hit' }, { name: 'Called shot', value: '-4', applies: 'hit' }, { name: 'Off hand', value: '-3', applies: 'hit' },
-    { name: 'Blinded / smoke', value: '-3', applies: 'hit' }, { name: 'Melee strength bonus', value: '+0', applies: 'dmg', auto: 'str' }, { name: 'Extra damage die', value: '+1d6', applies: 'dmg' }
+    { name: 'Blinded / smoke', value: '-3', applies: 'hit' }, { name: 'Large target', value: '+4', applies: 'hit' }, { name: 'Target silhouetted', value: '+2', applies: 'hit' },
+    { name: 'Smartgoggles', value: '+2', applies: 'hit' }, { name: 'Targeting scope', value: '+2', applies: 'hit' }, { name: 'Turret mounted', value: '+2', applies: 'hit' },
+    { name: 'Target dodging', value: '-2', applies: 'hit' }, { name: 'Turning to face', value: '-2', applies: 'hit' },
+    { name: 'Melee strength bonus', value: '+0', applies: 'dmg', auto: 'str' }, { name: 'Extra damage die', value: '+1d6', applies: 'dmg' }
   ];
   function strBonus(body) { return body <= 2 ? -2 : body <= 4 ? -1 : body <= 7 ? 0 : body <= 9 ? 1 : body === 10 ? 2 : body <= 12 ? 4 : body <= 14 ? 6 : 8; }
   function cleanModValue(v) {
@@ -253,6 +256,146 @@
   function moveMetres(m, x1, y1, x2, y2) { return Math.round(Math.hypot(x2 - x1, y2 - y1) / m.grid.size * 2 * 10) / 10; }
   function movedThisRound(state, t) { upgrade(state); return Number(state.init.moved[t.id]) || 0; }
   function isTokensTurn(state, t) { const cur = state.init.list[state.init.turn]; return !!(cur && t.sheetId && cur.sheetId === t.sheetId); }
+
+  // ---------- attacks against a target ----------
+  const RANGE_BANDS = [['Point blank', 10], ['Close', 15], ['Medium', 20], ['Long', 25], ['Extreme', 30]];
+  const COVER = [['Sheetrock', 5], ['Wood door', 5], ['Concrete', 10], ['Car body', 10], ['Heavy wood', 15], ['Steel door', 20], ['Brick wall', 25], ['Mailbox', 25], ['Curb', 25], ['Stone wall', 30], ['Tree / pole', 30], ['Engine block', 35], ['Hydrant', 35]];
+  const UNARMED = { punch: { name: 'Punch', dmg: '1d6', half: true }, strike: { name: 'Strike', dmg: '1d6', half: true }, kick: { name: 'Kick', dmg: '1d6', half: false } };
+  const MELEE_SKILLS = ['melee', 'fencing', 'brawling', 'martial arts'];
+  function isMeleeWeapon(w) { return !!w && (MELEE_SKILLS.includes(String(w.skill || '').toLowerCase()) || /melee|knife|sword|club|blade|axe|katana|baton|fist|unarmed/i.test(w.type || '')); }
+  // weapon range in metres: the number on the weapon, or the usual range for its type
+  function weaponRange(w, sheet) {
+    const n = parseFloat(String(w && w.range || '').replace(/[^0-9.]/g, ''));
+    if (n > 0) return n;
+    const t = String((w && (w.type + ' ' + w.skill)) || '').toLowerCase();
+    if (/thrown|grenade/.test(t)) return statVal(sheet, 'BODY') * 10;
+    if (/smg|submachine/.test(t)) return 150;
+    if (/shotgun/.test(t)) return 50;
+    if (/rifle|sniper|assault|heavy/.test(t)) return 400;
+    return 50; // pistols and anything else
+  }
+  function rangeBand(dist, range) {
+    if (dist <= 3) return 0;                 // point blank: right next to them, diagonals included
+    if (dist <= range / 4) return 1;
+    if (dist <= range / 2) return 2;
+    if (dist <= range) return 3;
+    if (dist <= range * 2) return 4;
+    return -1;                               // out of range
+  }
+  function tokenCentre(t, m) { const p = t.size * m.grid.size; return [t.x + p / 2, t.y + p / 2]; }
+  function tokenDistance(m, a, b) { const [x1, y1] = tokenCentre(a, m), [x2, y2] = tokenCentre(b, m); return Math.round(Math.hypot(x2 - x1, y2 - y1) / m.grid.size * 2 * 10) / 10; }
+  function locName(k) { const l = LOCS.find(x => x[0] === k); return l ? l[1] : k; }
+  function rollLocation() { const r = rnd(10); return r === 1 ? 'head' : r <= 4 ? 'torso' : r === 5 ? 'rArm' : r === 6 ? 'lArm' : r <= 8 ? 'rLeg' : 'lLeg'; }
+  function skillVal(sheet, name) { const k = (sheet.skills || []).find(x => x.name.toLowerCase() === String(name || '').toLowerCase()); return k ? Number(k.value) || 0 : 0; }
+  function safeFormula(f) { f = String(f || '').replace(/\s+/g, ''); if (!f) return ''; if (!/^[+-]/.test(f)) f = '+' + f; try { roll('0' + f); return f; } catch (e) { return null; } }
+
+  // the whole attack, rolled by the DM's app: to-hit vs range (or the target's dodge in melee), then damage
+  function resolveAttack(state, req, sender) {
+    upgrade(state);
+    const m = state.maps[req.mapId]; if (!m) return { error: 'No map' };
+    const at = m.tokens[req.attackerToken], tt = m.tokens[req.targetToken];
+    if (!at || !tt) return { error: 'Pick a target on the map first' };
+    if (at.id === tt.id) return { error: "You can't target yourself" };
+    const ash = at.sheetId && state.sheets[at.sheetId]; if (!ash) return { error: 'Your token needs to be linked to your character' };
+    if (!sender.isGM && ash.ownerId !== sender.id) return { error: "That's not your character" };
+    const tsh = tt.sheetId && state.sheets[tt.sheetId];
+    const attacker = clone(ash), target = tsh ? clone(tsh) : null;
+    const tName = (target && target.name) || tt.name || 'the target';
+    const lines = []; const dist = tokenDistance(m, at, tt);
+    // the weapon (or bare hands)
+    let w, wi = -1, unarmed = null;
+    if (String(req.weapon).startsWith('unarmed:')) { unarmed = UNARMED[String(req.weapon).slice(8)] || UNARMED.punch; }
+    else { wi = Number(req.weapon); w = attacker.weapons[wi]; if (!w) return { error: 'Pick a weapon' }; }
+    const melee = !!unarmed || isMeleeWeapon(w);
+    const wName = unarmed ? unarmed.name : (w.name || 'weapon');
+    if (melee && dist > 3) return { error: 'Too far for a melee attack (' + dist + ' m). Move next to them first.' };
+    // mode & ammo
+    let mode = melee ? 'single' : (['single', 'burst', 'auto'].includes(req.mode) ? req.mode : 'single');
+    const mag = w ? (parseInt(w.shots, 10) || 0) : 0;
+    let rounds = mode === 'burst' ? 3 : mode === 'auto' ? clamp(req.rounds || 10, 1, 200) : 1;
+    if (!melee && mag > 0) {
+      const left = clamp(w.left === undefined ? mag : w.left, 0, 9999);
+      if (left <= 0) return { error: '*Click* ' + wName + ' is empty. Reload first.' };
+      if (rounds > left) { lines.push('Only ' + left + ' round' + (left === 1 ? '' : 's') + ' left, firing those'); rounds = left; }
+      w.left = left - rounds;
+    }
+    // to-hit
+    const ref = effStat(attacker, 'REF');
+    const skillName = unarmed ? (skillVal(attacker, 'Martial Arts') > skillVal(attacker, 'Brawling') ? 'Martial Arts' : 'Brawling') : (w.skill || weaponSkill(w.type));
+    const skill = skillVal(attacker, skillName);
+    const wa = unarmed ? 0 : (Number(w.wa) || 0);
+    const hitMod = safeFormula(req.hitMod); if (hitMod === null) return { error: 'Bad to-hit modifier' };
+    const dmgMod = safeFormula(req.dmgMod); if (dmgMod === null) return { error: 'Bad damage modifier' };
+    let bonus = ref + skill + wa; const parts = ['REF ' + ref, skillName + ' ' + skill]; if (wa) parts.push('WA ' + (wa > 0 ? '+' : '') + wa);
+    let band = -1, dv = null, range = null;
+    if (!melee) {
+      range = weaponRange(w, attacker); band = rangeBand(dist, range);
+      if (band < 0) return { error: tName + ' is out of range: ' + dist + ' m, ' + wName + ' reaches ' + (range * 2) + ' m at most' };
+      dv = RANGE_BANDS[band][1];
+      if (mode === 'burst' && (band === 1 || band === 2)) { bonus += 3; parts.push('burst +3'); }
+      if (mode === 'auto') { const k = Math.floor(rounds / 10); if (k) { const v = band <= 1 ? k : -k; bonus += v; parts.push('full auto ' + (v > 0 ? '+' : '') + v); } }
+    }
+    const called = LOCS.some(l => l[0] === req.called) ? req.called : '';
+    if (called) { bonus -= 4; parts.push('called shot −4'); }
+    const atk = roll('1d10!' + (bonus >= 0 ? '+' : '') + bonus + (hitMod || ''));
+    lines.push('Attack: ' + rollToText(atk) + '  (' + parts.join(' + ').replace(/\+ -/g, '− ') + (hitMod ? ' + modifiers ' + hitMod : '') + ')' + (req.hitNote ? '  [' + str(req.hitNote, 200) + ']' : ''));
+    let hit, margin;
+    if (melee) {
+      if (target) {
+        const dodge = Math.max(skillVal(target, 'Dodge & Escape'), skillVal(target, 'Dodge/Escape'));
+        const def = roll('1d10!+' + (effStat(target, 'REF') + dodge));
+        lines.push(tName + ' dodges: ' + rollToText(def) + ' (REF + Dodge & Escape)');
+        hit = !atk.fumble && atk.total > def.total; margin = atk.total - def.total;
+      } else { dv = 15; hit = !atk.fumble && atk.total >= dv; margin = atk.total - dv; lines.push('Needs ' + dv + ' (target has no sheet)'); }
+    } else {
+      lines.push('Range: ' + dist + ' m · ' + RANGE_BANDS[band][0] + ' (weapon range ' + range + ' m) → needs ' + dv);
+      hit = !atk.fumble && atk.total >= dv; margin = atk.total - dv;
+    }
+    if (atk.fumble) lines.push('FUMBLE: a natural 1. The DM decides what goes wrong.');
+    // how many bullets land
+    let hits = 0;
+    if (hit) {
+      if (mode === 'burst') { const r = roll('1d6'); hits = Math.ceil(r.total / 2); lines.push('Burst: 1d6[' + r.total + '] ÷ 2 → ' + hits + ' round' + (hits === 1 ? '' : 's') + ' hit'); }
+      else if (mode === 'auto') { hits = Math.min(rounds, Math.max(1, margin)); lines.push('Full auto: beat the roll by ' + margin + ' → ' + hits + ' of ' + rounds + ' rounds hit'); }
+      else hits = 1;
+    }
+    // damage, one hit at a time
+    let totalWounds = 0; const hitDetail = [];
+    const cover = clamp(req.cover || 0, 0, 100); const ap = !!req.ap;
+    const maBonus = unarmed && skillName === 'Martial Arts' ? skill : 0;
+    for (let h = 0; h < hits; h++) {
+      const loc = called || rollLocation();
+      let dmgRoll; try { dmgRoll = roll((unarmed ? unarmed.dmg : String(w.damage || '1d6').replace(/D/g, 'd')) + (dmgMod || '') + (maBonus ? '+' + maBonus : '')); } catch (e) { return { error: 'The damage "' + (w && w.damage) + '" isn\'t a dice roll like 2d6+3' }; }
+      let dmg = dmgRoll.total; if (unarmed && unarmed.half) dmg = Math.max(1, Math.ceil(dmg / 2));
+      const d = { loc, rolled: dmg, text: rollToText(dmgRoll) + (unarmed && unarmed.half ? ' ÷ 2 = ' + dmg : '') };
+      if (target) {
+        let sp = (Number(target.sp[loc]) || 0) + cover; if (ap) sp = Math.floor(sp / 2);
+        let through = Math.max(0, dmg - sp);
+        if (through > 0 && loc === 'head') through *= 2;
+        const btm = derived(target).btm;
+        const wounds = through > 0 ? Math.max(1, through + btm) : 0;
+        if (wounds > 0 && (Number(target.sp[loc]) || 0) > 0) { target.sp[loc] -= 1; d.wear = true; }
+        target.damage = Math.min(41, target.damage + wounds); totalWounds += wounds;
+        Object.assign(d, { sp, through, btm, wounds });
+        if (wounds >= 8 && loc === 'head') { d.note = 'Head hit of 8+: killed outright'; target.damage = 41; }
+        else if (wounds >= 8 && loc !== 'torso') d.note = 'Limb hit of 8+: severed or crushed (Mortal 0)';
+      }
+      hitDetail.push(d);
+      lines.push('Hit ' + (h + 1) + ' · ' + locName(loc) + ': ' + d.text + (target ? '  − SP ' + d.sp + (ap ? ' (AP)' : '') + (d.through > 0 && loc === 'head' ? ' → ×2 head' : '') + ' − BTM ' + (-d.btm) + ' = ' + d.wounds + ' wound' + (d.wounds === 1 ? '' : 's') + (d.wear ? ' (armor −1 SP)' : '') : '') + (d.note ? '  ⚠ ' + d.note : ''));
+    }
+    // stun save for the target
+    if (target && totalWounds > 0 && target.damage >= 41) lines.push('☠ ' + tName + ' is DEAD.');
+    else if (target && totalWounds > 0) {
+      const dd = derived(target); const st = roll('1d10');
+      lines.push(tName + ' is now ' + woundInfo(target.damage).label + ' (' + target.damage + '/40). Stun save: 1d10[' + st.total + '] vs ' + dd.stunTarget + ' or less → ' + (st.total <= dd.stunTarget ? 'stays up' : 'STUNNED'));
+      if (dd.deathTarget !== null) lines.push('Mortally wounded: ' + tName + ' must make a death save every turn (' + dd.deathTarget + ' or less on 1d10).');
+    }
+    const ops = [];
+    if (w && mag > 0) ops.push({ type: 'sheet.upsert', sheet: sanitizeSheet(attacker) });
+    if (target && totalWounds > 0) ops.push({ type: 'sheet.upsert', sheet: sanitizeSheet(target) });
+    const title = attacker.name + ' → ' + tName + ' · ' + wName + (mode === 'burst' ? ' (3-round burst)' : mode === 'auto' ? ' (full auto, ' + rounds + ' rounds)' : '');
+    return { ops, combat: { title, hit, hits, wounds: totalWounds, lines, attack: atk.total, dv, fumble: atk.fumble, crit: atk.crit } };
+  }
 
   // ---------- journal visibility ----------
   // vis.mode: 'gm' (DM only), 'all' (everyone), 'some' (DM + the players in vis.ids). Owners always see their own.
@@ -460,6 +603,10 @@
         if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such sound');
         out.transient.push({ type: 'sound', track: { id: t.id, name: t.name, url: t.url, file: t.file }, volume: clamp(req.volume ?? 1, 0, 1) }); return out;
       }
+      case 'attack': {
+        const r = resolveAttack(state, req, sender); if (r.error) return deny(r.error);
+        out.ops.push(...r.ops, { type: 'chat', msg: chatMsg({ combat: r.combat }) }); return out;
+      }
       case 'ping': out.transient.push({ type: 'ping', x: clamp(req.x, -1e5, 1e5), y: clamp(req.y, -1e5, 1e5), mapId: str(req.mapId, 20), by: sender.id }); return out;
       default: return deny('Unknown action');
     }
@@ -584,5 +731,5 @@
   }
 
   root.NCT = { uid, code, clone, roll, rollToText, STATS, SKILLS_BY_STAT, SKILL_STAT, ROLES, LOCS, weaponSkill, blankSheet, statVal, effStat, derived, woundInfo, skillTotal,
-    DEFAULT_MODS, strBonus, cleanModValue, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
+    DEFAULT_MODS, strBonus, cleanModValue, RANGE_BANDS, COVER, UNARMED, isMeleeWeapon, weaponRange, rangeBand, tokenDistance, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
 })(typeof window !== 'undefined' ? window : globalThis);

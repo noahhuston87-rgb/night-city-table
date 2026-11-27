@@ -136,6 +136,10 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.08em;text-transform
 .b-priv{border:1px solid var(--dim);color:var(--dim)}
 .b-vis{border:1px solid currentColor}
 #chatbox{border-top:1px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:6px}
+
+.msg.combat{border-left-width:4px}
+.msg.combat.hit .total{color:var(--red);text-shadow:0 0 calc(8px*var(--gl)) color-mix(in srgb,var(--red) 60%,transparent)}
+.msg.combat.miss .total{color:var(--dim);text-shadow:none}
 #quickdice{display:flex;gap:4px;flex-wrap:wrap}
 #quickdice button{padding:2px 8px;font-size:.8rem;font-family:var(--mono);text-transform:none}
 

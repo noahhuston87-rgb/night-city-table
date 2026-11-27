@@ -151,6 +151,10 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.08em;text-transform
 .b-priv{border:1px solid var(--dim);color:var(--dim)}
 .b-vis{border:1px solid currentColor}
 #chatbox{border-top:1px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:6px}
+
+.msg.combat{border-left-width:4px}
+.msg.combat.hit .total{color:var(--red);text-shadow:0 0 calc(8px*var(--gl)) color-mix(in srgb,var(--red) 60%,transparent)}
+.msg.combat.miss .total{color:var(--dim);text-shadow:none}
 #quickdice{display:flex;gap:4px;flex-wrap:wrap}
 #quickdice button{padding:2px 8px;font-size:.8rem;font-family:var(--mono);text-transform:none}
 
@@ -394,6 +398,7 @@ table.wt input{width:100%;padding:2px 4px}
     <button data-tool="move" class="on" title="Move tokens / pan (drag empty space)">✥</button>
     <button data-tool="ruler" title="Measure distance">📏</button>
     <button data-tool="ping" title="Ping a spot (or Alt+click)">◎</button>
+    <button data-tool="target" title="Target: click a token to aim at it">🎯</button>
     <div style="height:8px"></div>
     <button id="centerBtn" title="Fit map to screen">⤢</button>
   </div>
@@ -681,7 +686,10 @@ function nctSiteHelper() {
     { name: 'Aiming', value: '+1', applies: 'hit' }, { name: 'Smartgun link', value: '+2', applies: 'hit' }, { name: 'Laser sight', value: '+1', applies: 'hit' },
     { name: 'Target immobile', value: '+4', applies: 'hit' }, { name: 'Ambush', value: '+5', applies: 'hit' }, { name: 'Running', value: '-3', applies: 'hit' },
     { name: 'Fast draw', value: '-3', applies: 'hit' }, { name: 'Called shot', value: '-4', applies: 'hit' }, { name: 'Off hand', value: '-3', applies: 'hit' },
-    { name: 'Blinded / smoke', value: '-3', applies: 'hit' }, { name: 'Melee strength bonus', value: '+0', applies: 'dmg', auto: 'str' }, { name: 'Extra damage die', value: '+1d6', applies: 'dmg' }
+    { name: 'Blinded / smoke', value: '-3', applies: 'hit' }, { name: 'Large target', value: '+4', applies: 'hit' }, { name: 'Target silhouetted', value: '+2', applies: 'hit' },
+    { name: 'Smartgoggles', value: '+2', applies: 'hit' }, { name: 'Targeting scope', value: '+2', applies: 'hit' }, { name: 'Turret mounted', value: '+2', applies: 'hit' },
+    { name: 'Target dodging', value: '-2', applies: 'hit' }, { name: 'Turning to face', value: '-2', applies: 'hit' },
+    { name: 'Melee strength bonus', value: '+0', applies: 'dmg', auto: 'str' }, { name: 'Extra damage die', value: '+1d6', applies: 'dmg' }
   ];
   function strBonus(body) { return body <= 2 ? -2 : body <= 4 ? -1 : body <= 7 ? 0 : body <= 9 ? 1 : body === 10 ? 2 : body <= 12 ? 4 : body <= 14 ? 6 : 8; }
   function cleanModValue(v) {
@@ -860,6 +868,146 @@ function nctSiteHelper() {
   function moveMetres(m, x1, y1, x2, y2) { return Math.round(Math.hypot(x2 - x1, y2 - y1) / m.grid.size * 2 * 10) / 10; }
   function movedThisRound(state, t) { upgrade(state); return Number(state.init.moved[t.id]) || 0; }
   function isTokensTurn(state, t) { const cur = state.init.list[state.init.turn]; return !!(cur && t.sheetId && cur.sheetId === t.sheetId); }
+
+  // ---------- attacks against a target ----------
+  const RANGE_BANDS = [['Point blank', 10], ['Close', 15], ['Medium', 20], ['Long', 25], ['Extreme', 30]];
+  const COVER = [['Sheetrock', 5], ['Wood door', 5], ['Concrete', 10], ['Car body', 10], ['Heavy wood', 15], ['Steel door', 20], ['Brick wall', 25], ['Mailbox', 25], ['Curb', 25], ['Stone wall', 30], ['Tree / pole', 30], ['Engine block', 35], ['Hydrant', 35]];
+  const UNARMED = { punch: { name: 'Punch', dmg: '1d6', half: true }, strike: { name: 'Strike', dmg: '1d6', half: true }, kick: { name: 'Kick', dmg: '1d6', half: false } };
+  const MELEE_SKILLS = ['melee', 'fencing', 'brawling', 'martial arts'];
+  function isMeleeWeapon(w) { return !!w && (MELEE_SKILLS.includes(String(w.skill || '').toLowerCase()) || /melee|knife|sword|club|blade|axe|katana|baton|fist|unarmed/i.test(w.type || '')); }
+  // weapon range in metres: the number on the weapon, or the usual range for its type
+  function weaponRange(w, sheet) {
+    const n = parseFloat(String(w && w.range || '').replace(/[^0-9.]/g, ''));
+    if (n > 0) return n;
+    const t = String((w && (w.type + ' ' + w.skill)) || '').toLowerCase();
+    if (/thrown|grenade/.test(t)) return statVal(sheet, 'BODY') * 10;
+    if (/smg|submachine/.test(t)) return 150;
+    if (/shotgun/.test(t)) return 50;
+    if (/rifle|sniper|assault|heavy/.test(t)) return 400;
+    return 50; // pistols and anything else
+  }
+  function rangeBand(dist, range) {
+    if (dist <= 3) return 0;                 // point blank: right next to them, diagonals included
+    if (dist <= range / 4) return 1;
+    if (dist <= range / 2) return 2;
+    if (dist <= range) return 3;
+    if (dist <= range * 2) return 4;
+    return -1;                               // out of range
+  }
+  function tokenCentre(t, m) { const p = t.size * m.grid.size; return [t.x + p / 2, t.y + p / 2]; }
+  function tokenDistance(m, a, b) { const [x1, y1] = tokenCentre(a, m), [x2, y2] = tokenCentre(b, m); return Math.round(Math.hypot(x2 - x1, y2 - y1) / m.grid.size * 2 * 10) / 10; }
+  function locName(k) { const l = LOCS.find(x => x[0] === k); return l ? l[1] : k; }
+  function rollLocation() { const r = rnd(10); return r === 1 ? 'head' : r <= 4 ? 'torso' : r === 5 ? 'rArm' : r === 6 ? 'lArm' : r <= 8 ? 'rLeg' : 'lLeg'; }
+  function skillVal(sheet, name) { const k = (sheet.skills || []).find(x => x.name.toLowerCase() === String(name || '').toLowerCase()); return k ? Number(k.value) || 0 : 0; }
+  function safeFormula(f) { f = String(f || '').replace(/\s+/g, ''); if (!f) return ''; if (!/^[+-]/.test(f)) f = '+' + f; try { roll('0' + f); return f; } catch (e) { return null; } }
+
+  // the whole attack, rolled by the DM's app: to-hit vs range (or the target's dodge in melee), then damage
+  function resolveAttack(state, req, sender) {
+    upgrade(state);
+    const m = state.maps[req.mapId]; if (!m) return { error: 'No map' };
+    const at = m.tokens[req.attackerToken], tt = m.tokens[req.targetToken];
+    if (!at || !tt) return { error: 'Pick a target on the map first' };
+    if (at.id === tt.id) return { error: "You can't target yourself" };
+    const ash = at.sheetId && state.sheets[at.sheetId]; if (!ash) return { error: 'Your token needs to be linked to your character' };
+    if (!sender.isGM && ash.ownerId !== sender.id) return { error: "That's not your character" };
+    const tsh = tt.sheetId && state.sheets[tt.sheetId];
+    const attacker = clone(ash), target = tsh ? clone(tsh) : null;
+    const tName = (target && target.name) || tt.name || 'the target';
+    const lines = []; const dist = tokenDistance(m, at, tt);
+    // the weapon (or bare hands)
+    let w, wi = -1, unarmed = null;
+    if (String(req.weapon).startsWith('unarmed:')) { unarmed = UNARMED[String(req.weapon).slice(8)] || UNARMED.punch; }
+    else { wi = Number(req.weapon); w = attacker.weapons[wi]; if (!w) return { error: 'Pick a weapon' }; }
+    const melee = !!unarmed || isMeleeWeapon(w);
+    const wName = unarmed ? unarmed.name : (w.name || 'weapon');
+    if (melee && dist > 3) return { error: 'Too far for a melee attack (' + dist + ' m). Move next to them first.' };
+    // mode & ammo
+    let mode = melee ? 'single' : (['single', 'burst', 'auto'].includes(req.mode) ? req.mode : 'single');
+    const mag = w ? (parseInt(w.shots, 10) || 0) : 0;
+    let rounds = mode === 'burst' ? 3 : mode === 'auto' ? clamp(req.rounds || 10, 1, 200) : 1;
+    if (!melee && mag > 0) {
+      const left = clamp(w.left === undefined ? mag : w.left, 0, 9999);
+      if (left <= 0) return { error: '*Click* ' + wName + ' is empty. Reload first.' };
+      if (rounds > left) { lines.push('Only ' + left + ' round' + (left === 1 ? '' : 's') + ' left, firing those'); rounds = left; }
+      w.left = left - rounds;
+    }
+    // to-hit
+    const ref = effStat(attacker, 'REF');
+    const skillName = unarmed ? (skillVal(attacker, 'Martial Arts') > skillVal(attacker, 'Brawling') ? 'Martial Arts' : 'Brawling') : (w.skill || weaponSkill(w.type));
+    const skill = skillVal(attacker, skillName);
+    const wa = unarmed ? 0 : (Number(w.wa) || 0);
+    const hitMod = safeFormula(req.hitMod); if (hitMod === null) return { error: 'Bad to-hit modifier' };
+    const dmgMod = safeFormula(req.dmgMod); if (dmgMod === null) return { error: 'Bad damage modifier' };
+    let bonus = ref + skill + wa; const parts = ['REF ' + ref, skillName + ' ' + skill]; if (wa) parts.push('WA ' + (wa > 0 ? '+' : '') + wa);
+    let band = -1, dv = null, range = null;
+    if (!melee) {
+      range = weaponRange(w, attacker); band = rangeBand(dist, range);
+      if (band < 0) return { error: tName + ' is out of range: ' + dist + ' m, ' + wName + ' reaches ' + (range * 2) + ' m at most' };
+      dv = RANGE_BANDS[band][1];
+      if (mode === 'burst' && (band === 1 || band === 2)) { bonus += 3; parts.push('burst +3'); }
+      if (mode === 'auto') { const k = Math.floor(rounds / 10); if (k) { const v = band <= 1 ? k : -k; bonus += v; parts.push('full auto ' + (v > 0 ? '+' : '') + v); } }
+    }
+    const called = LOCS.some(l => l[0] === req.called) ? req.called : '';
+    if (called) { bonus -= 4; parts.push('called shot −4'); }
+    const atk = roll('1d10!' + (bonus >= 0 ? '+' : '') + bonus + (hitMod || ''));
+    lines.push('Attack: ' + rollToText(atk) + '  (' + parts.join(' + ').replace(/\+ -/g, '− ') + (hitMod ? ' + modifiers ' + hitMod : '') + ')' + (req.hitNote ? '  [' + str(req.hitNote, 200) + ']' : ''));
+    let hit, margin;
+    if (melee) {
+      if (target) {
+        const dodge = Math.max(skillVal(target, 'Dodge & Escape'), skillVal(target, 'Dodge/Escape'));
+        const def = roll('1d10!+' + (effStat(target, 'REF') + dodge));
+        lines.push(tName + ' dodges: ' + rollToText(def) + ' (REF + Dodge & Escape)');
+        hit = !atk.fumble && atk.total > def.total; margin = atk.total - def.total;
+      } else { dv = 15; hit = !atk.fumble && atk.total >= dv; margin = atk.total - dv; lines.push('Needs ' + dv + ' (target has no sheet)'); }
+    } else {
+      lines.push('Range: ' + dist + ' m · ' + RANGE_BANDS[band][0] + ' (weapon range ' + range + ' m) → needs ' + dv);
+      hit = !atk.fumble && atk.total >= dv; margin = atk.total - dv;
+    }
+    if (atk.fumble) lines.push('FUMBLE: a natural 1. The DM decides what goes wrong.');
+    // how many bullets land
+    let hits = 0;
+    if (hit) {
+      if (mode === 'burst') { const r = roll('1d6'); hits = Math.ceil(r.total / 2); lines.push('Burst: 1d6[' + r.total + '] ÷ 2 → ' + hits + ' round' + (hits === 1 ? '' : 's') + ' hit'); }
+      else if (mode === 'auto') { hits = Math.min(rounds, Math.max(1, margin)); lines.push('Full auto: beat the roll by ' + margin + ' → ' + hits + ' of ' + rounds + ' rounds hit'); }
+      else hits = 1;
+    }
+    // damage, one hit at a time
+    let totalWounds = 0; const hitDetail = [];
+    const cover = clamp(req.cover || 0, 0, 100); const ap = !!req.ap;
+    const maBonus = unarmed && skillName === 'Martial Arts' ? skill : 0;
+    for (let h = 0; h < hits; h++) {
+      const loc = called || rollLocation();
+      let dmgRoll; try { dmgRoll = roll((unarmed ? unarmed.dmg : String(w.damage || '1d6').replace(/D/g, 'd')) + (dmgMod || '') + (maBonus ? '+' + maBonus : '')); } catch (e) { return { error: 'The damage "' + (w && w.damage) + '" isn\'t a dice roll like 2d6+3' }; }
+      let dmg = dmgRoll.total; if (unarmed && unarmed.half) dmg = Math.max(1, Math.ceil(dmg / 2));
+      const d = { loc, rolled: dmg, text: rollToText(dmgRoll) + (unarmed && unarmed.half ? ' ÷ 2 = ' + dmg : '') };
+      if (target) {
+        let sp = (Number(target.sp[loc]) || 0) + cover; if (ap) sp = Math.floor(sp / 2);
+        let through = Math.max(0, dmg - sp);
+        if (through > 0 && loc === 'head') through *= 2;
+        const btm = derived(target).btm;
+        const wounds = through > 0 ? Math.max(1, through + btm) : 0;
+        if (wounds > 0 && (Number(target.sp[loc]) || 0) > 0) { target.sp[loc] -= 1; d.wear = true; }
+        target.damage = Math.min(41, target.damage + wounds); totalWounds += wounds;
+        Object.assign(d, { sp, through, btm, wounds });
+        if (wounds >= 8 && loc === 'head') { d.note = 'Head hit of 8+: killed outright'; target.damage = 41; }
+        else if (wounds >= 8 && loc !== 'torso') d.note = 'Limb hit of 8+: severed or crushed (Mortal 0)';
+      }
+      hitDetail.push(d);
+      lines.push('Hit ' + (h + 1) + ' · ' + locName(loc) + ': ' + d.text + (target ? '  − SP ' + d.sp + (ap ? ' (AP)' : '') + (d.through > 0 && loc === 'head' ? ' → ×2 head' : '') + ' − BTM ' + (-d.btm) + ' = ' + d.wounds + ' wound' + (d.wounds === 1 ? '' : 's') + (d.wear ? ' (armor −1 SP)' : '') : '') + (d.note ? '  ⚠ ' + d.note : ''));
+    }
+    // stun save for the target
+    if (target && totalWounds > 0 && target.damage >= 41) lines.push('☠ ' + tName + ' is DEAD.');
+    else if (target && totalWounds > 0) {
+      const dd = derived(target); const st = roll('1d10');
+      lines.push(tName + ' is now ' + woundInfo(target.damage).label + ' (' + target.damage + '/40). Stun save: 1d10[' + st.total + '] vs ' + dd.stunTarget + ' or less → ' + (st.total <= dd.stunTarget ? 'stays up' : 'STUNNED'));
+      if (dd.deathTarget !== null) lines.push('Mortally wounded: ' + tName + ' must make a death save every turn (' + dd.deathTarget + ' or less on 1d10).');
+    }
+    const ops = [];
+    if (w && mag > 0) ops.push({ type: 'sheet.upsert', sheet: sanitizeSheet(attacker) });
+    if (target && totalWounds > 0) ops.push({ type: 'sheet.upsert', sheet: sanitizeSheet(target) });
+    const title = attacker.name + ' → ' + tName + ' · ' + wName + (mode === 'burst' ? ' (3-round burst)' : mode === 'auto' ? ' (full auto, ' + rounds + ' rounds)' : '');
+    return { ops, combat: { title, hit, hits, wounds: totalWounds, lines, attack: atk.total, dv, fumble: atk.fumble, crit: atk.crit } };
+  }
 
   // ---------- journal visibility ----------
   // vis.mode: 'gm' (DM only), 'all' (everyone), 'some' (DM + the players in vis.ids). Owners always see their own.
@@ -1067,6 +1215,10 @@ function nctSiteHelper() {
         if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such sound');
         out.transient.push({ type: 'sound', track: { id: t.id, name: t.name, url: t.url, file: t.file }, volume: clamp(req.volume ?? 1, 0, 1) }); return out;
       }
+      case 'attack': {
+        const r = resolveAttack(state, req, sender); if (r.error) return deny(r.error);
+        out.ops.push(...r.ops, { type: 'chat', msg: chatMsg({ combat: r.combat }) }); return out;
+      }
       case 'ping': out.transient.push({ type: 'ping', x: clamp(req.x, -1e5, 1e5), y: clamp(req.y, -1e5, 1e5), mapId: str(req.mapId, 20), by: sender.id }); return out;
       default: return deny('Unknown action');
     }
@@ -1191,7 +1343,7 @@ function nctSiteHelper() {
   }
 
   root.NCT = { uid, code, clone, roll, rollToText, STATS, SKILLS_BY_STAT, SKILL_STAT, ROLES, LOCS, weaponSkill, blankSheet, statVal, effStat, derived, woundInfo, skillTotal,
-    DEFAULT_MODS, strBonus, cleanModValue, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
+    DEFAULT_MODS, strBonus, cleanModValue, RANGE_BANDS, COVER, UNARMED, isMeleeWeapon, weaponRange, rangeBand, tokenDistance, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -1600,6 +1752,7 @@ window.peerReady = new Promise(function (resolve) {
     if (nearBottom || full) log.scrollTop = log.scrollHeight;
   }
   function msgEl(m) {
+    if (m.combat) return combatMsgEl(m);
     const d = el('div', { class: 'msg' + (m.private ? ' priv' : ''), style: '--c:' + playerColor(m.from) },
       el('span', { class: 'when', text: timeStr(m.ts) }), el('div', { class: 'who', text: m.name || playerName(m.from) }));
     if (m.roll) {
@@ -1674,6 +1827,7 @@ window.peerReady = new Promise(function (resolve) {
     if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'under');
     for (const t of visibleTokens(m)) drawToken(t, m, v);
     if (drag && m.tokens[drag.id]) drawMoveRuler(m.tokens[drag.id], m, v, 'over');
+    drawTargeting(m, v);
     if (ruler) {
       ctx.save(); ctx.strokeStyle = TH.t; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
       ctx.beginPath(); ctx.moveTo(ruler.x1, ruler.y1); ctx.lineTo(ruler.x2, ruler.y2); ctx.stroke(); ctx.setLineDash([]);
@@ -1774,6 +1928,7 @@ window.peerReady = new Promise(function (resolve) {
     if (e.button === 1 || e.button === 2) { pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: e.button }; if (e.button === 2) ctxDown = { x: e.clientX, y: e.clientY, w }; return; }
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
+    if (tool === 'target') { const tt = hitToken(w.x, w.y); setTarget(tt && (!myTokenOnMap() || tt.id !== myTokenOnMap().id) ? tt : null); return; }
     const t = hitToken(w.x, w.y);
     if (t) {
       selected = t.id;
@@ -1790,7 +1945,7 @@ window.peerReady = new Promise(function (resolve) {
     const w = toWorld(e.offsetX, e.offsetY);
     if (drag) { drag.x = w.x - drag.dx; drag.y = w.y - drag.dy; draw(); return; }
     if (ruler && ruler.active) { ruler.x2 = w.x; ruler.y2 = w.y; draw(); }
-    const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
+    const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' || tool === 'target' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
   });
   cv.addEventListener('pointerup', e => {
     const m = activeMap();
@@ -1826,9 +1981,11 @@ window.peerReady = new Promise(function (resolve) {
   // token context menu
   function closeCtx() { const c = $('#ctx'); if (c) c.remove(); }
   function openCtx(t, x, y) {
-    closeCtx(); if (!canMoveToken(t) && !(t.sheetId && S.sheets[t.sheetId])) return;
+    closeCtx();
     const m = activeMap(); const upd = patch => request({ type: 'token.update', mapId: m.id, id: t.id, patch });
     const items = [];
+    const mine = myTokenOnMap();
+    if (!mine || mine.id !== t.id) { items.push([targetId === t.id ? '🎯 Clear target' : '🎯 Target', () => setTarget(targetId === t.id ? null : t)]); if (mine) items.push(['🎯 Attack this…', () => { setTarget(t); openAttack(); }]); }
     if (t.sheetId && S.sheets[t.sheetId]) items.push(['Open character sheet', () => openSheetModal(t.sheetId)]);
     if (canMoveToken(t)) {
       items.push(['Rename…', () => askText('Token name', t.name, n => upd({ name: n }))]);
@@ -1843,6 +2000,7 @@ window.peerReady = new Promise(function (resolve) {
       items.push(['Link to a character…', () => linkTokenDialog(t)]);
     }
     if (canMoveToken(t)) items.push(['Delete token', () => request({ type: 'token.delete', mapId: m.id, id: t.id })]);
+    if (!items.length) return;
     const box = el('div', { id: 'ctx', style: 'left:' + Math.min(x, innerWidth - 190) + 'px;top:' + Math.min(y, innerHeight - items.length * 34 - 10) + 'px' });
     for (const [label, fn] of items) box.appendChild(el('button', { text: label, onclick: () => { closeCtx(); fn(); } }));
     document.body.appendChild(box);
@@ -2139,6 +2297,7 @@ window.peerReady = new Promise(function (resolve) {
         el('td', { style: 'white-space:nowrap' },
           el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles. Uses 1 round.', onclick: () => useAmmo(s, i, 1, true) && rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
           el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage + ', plus your switched-on damage toggles', onclick: () => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg', { ap: /\bAP\b/i.test(w.notes || '') }) }), ' ',
+          el('button', { class: 'small pink', text: '🎯', title: 'Attack your target with this weapon (range, hit and damage worked out for you)', onclick: () => { closeModal(); openAttack(i); } }), ' ',
           el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together. Uses 1 round.', onclick: () => { if (!useAmmo(s, i, 1, true)) return; rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
           ed ? el('button', { class: 'small ghost', text: '✕', onclick: () => { s.weapons.splice(i, 1); saveSheetSoon(); renderSheetModal(false); } }) : null)));
     });
@@ -2657,7 +2816,8 @@ window.peerReady = new Promise(function (resolve) {
     const sel = el('select', { style: 'max-width:140px;font-size:.8rem;padding:2px 4px', onchange: e => { LS.set(key, e.target.value); renderMacroBar(); } }, ...mine.map(x => el('option', { value: x.id, text: x.name, selected: x.id === cur.id })));
     const sh = N.clone(cur);
     const macros = el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' }, ...(sh.macros || []).map(mc => el('button', { class: 'small primary', style: 'text-transform:none', title: mc.formula, text: '▶ ' + mc.name, onclick: () => runMacro(sh, mc), oncontextmenu: e => { e.preventDefault(); editMacroDialog(sh, mc, renderMacroBar); } })),
-      el('button', { class: 'small ghost', text: '+ Macro', title: 'Make a roll button', onclick: () => editMacroDialog(sh, null, renderMacroBar) }));
+      el('button', { class: 'small ghost', text: '+ Macro', title: 'Make a roll button', onclick: () => editMacroDialog(sh, null, renderMacroBar) }),
+      el('button', { class: 'small pink', text: '🎯 Attack', title: 'Attack your target (pick one with the 🎯 tool or right-click → Target)', onclick: () => openAttack() }));
     const on = (sh.mods || []).filter(m => m.on);
     bar.append(...[el('div', { class: 'row', style: 'gap:6px' }, sel, macros),
       el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px;margin-top:4px' },
@@ -2847,6 +3007,10 @@ window.peerReady = new Promise(function (resolve) {
       ['Skill checks', ['Roll 1d10 + STAT + SKILL. Beat the difficulty: Easy 10 · Average 15 · Difficult 20 · Very Difficult 25 · Nearly Impossible 30.', 'A natural 10 explodes: roll again and add it. A natural 1 is a fumble, and the DM decides what goes wrong.', 'Contested checks: both sides roll and the higher total wins.']],
       ['Turn order', ['Initiative: 1d10 + REF (Solos add Combat Sense). Highest goes first.', 'A turn is about 3 seconds: move, plus one action. Each extra action in a turn is −3.']],
       ['Ranged attacks', ['Roll 1d10 + REF + weapon skill + weapon accuracy (WA) against the range difficulty:', 'Point blank 10 · Close (up to ¼ range) 15 · Medium (½ range) 20 · Long (full range) 25 · Extreme (up to 2× range) 30.', 'Common modifiers: aiming +1 per turn (max +3), ambush +5, target not moving +4, running −3, fast draw −3, called shot −4, off hand −3.', 'Three-round burst: +3 at close and medium range. If it hits, half of 1d6 rounds hit (round up).', 'Full auto: each point you beat the difficulty by is one more bullet hitting (up to the rounds fired). Close range gets +1 per 10 rounds; longer ranges −1 per 10.']],
+      ['Weapon ranges', ['Pistol 50 m · SMG 150 m · Shotgun 50 m · Rifle 400 m · Thrown BODY × 10 m.', 'Range bands from the weapon\'s range: Point blank (next to them) 10 · Close (¼) 15 · Medium (½) 20 · Long (full) 25 · Extreme (2×) 30.']],
+      ['Attack modifiers', ['Ambush +5 · Target immobile +4 · Large target +4 · 3-round burst +3 (close/medium) · Smartgun link +2 · Smartgoggles +2 · Targeting scope +2 · Target silhouetted +2 · Turret mounted +2 · Laser sight +1 · Aiming +1 per round (max +3).', 'Target dodging −2 · Turning to face −2 · Running −3 · Fast draw −3 · Off hand −3 · Called shot −4.']],
+      ['Cover SP', ['Sheetrock 5 · Wood door 5 · Concrete 10 · Car body 10 · Heavy wood 15 · Steel door 20 · Brick wall 25 · Mailbox 25 · Curb 25 · Stone wall 30 · Tree/pole 30 · Engine block 35 · Hydrant 35.']],
+      ['Unarmed', ['Punch or strike 1d6 ÷ 2 · Kick 1d6. Add the strength damage bonus. Martial Arts adds its skill level to the damage.']],
       ['Melee', ['Attacker: 1d10 + REF + melee skill. Defender: 1d10 + REF + Dodge & Escape (or their melee skill). Higher wins.', 'Strength damage bonus by BODY: 2 → −2 · 3-4 → −1 · 5-7 → 0 · 8-9 → +1 · 10 → +2 · 11-12 → +4 · 13-14 → +6 · 15+ → +8.']],
       ['Hit location (1d10)', ['1 Head · 2-4 Torso · 5 Right arm · 6 Left arm · 7-8 Right leg · 9-10 Left leg.']],
       ['Damage, step by step', ['1. Roll weapon damage.', '2. Subtract the armor SP at the hit location.', '3. Head hit: double what got through.', '4. Subtract the Body Type Modifier (BTM). If anything got past the armor, at least 1 point still lands.', '5. Mark it on the wound track. Armor that was beaten loses 1 SP.', '8+ points to a limb after armor: the limb is severed or crushed (Mortal 0). 8+ to the head kills outright.']],
@@ -2945,6 +3109,7 @@ window.peerReady = new Promise(function (resolve) {
         el('span', { class: 'ac' + (left === 0 ? ' empty' : left <= Math.ceil(max / 4) ? ' low' : ''), text: left + ' / ' + max + (w.mags ? '  +' + w.mags + ' mag' + (w.mags === 1 ? '' : 's') : '') }),
         max <= 60 ? el('div', { class: 'rounds' }, ...Array.from({ length: max }, (_, k) => el('i', { class: k < left ? '' : 'e' }))) : null,
         el('div', { class: 'ab' },
+          el('button', { class: 'small pink', text: '🎯', title: 'Attack your target with this gun', onclick: () => openAttack(i) }),
           el('button', { class: 'small', text: '−1', title: 'Fire one round', onclick: () => useAmmo(sh, i, 1) }),
           el('button', { class: 'small', text: '−3', title: 'Three-round burst', onclick: () => useAmmo(sh, i, 3) }),
           el('button', { class: 'small', text: '−10', title: 'Full auto (10 rounds)', onclick: () => useAmmo(sh, i, 10) }),
@@ -2953,6 +3118,101 @@ window.peerReady = new Promise(function (resolve) {
           el('button', { class: 'small ghost', text: 'mags −', title: 'One fewer spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = Math.max(0, (s2.weapons[i].mags || 0) - 1); request({ type: 'sheet.upsert', sheet: s2 }); } }),
           el('button', { class: 'small ghost', text: 'mags +', title: 'One more spare magazine', onclick: () => { const s2 = N.clone(sh); s2.weapons[i].mags = (s2.weapons[i].mags || 0) + 1; request({ type: 'sheet.upsert', sheet: s2 }); } }))));
     }
+  }
+
+  // ================= TARGETING & ATTACKS =================
+  let targetId = null;
+  function myTokenOnMap() {
+    const m = activeMap(); const sh = ammoSheet(); if (!m || !sh) return null;
+    return Object.values(m.tokens).find(t => t.sheetId === sh.id) || null;
+  }
+  function setTarget(t) { targetId = t ? t.id : null; draw(); renderAmmoBar(); if (t) toast('🎯 Target: ' + (t.name || (S.sheets[t.sheetId] && S.sheets[t.sheetId].name) || 'token')); }
+  function drawTargeting(m, v) {
+    const t = targetId && m.tokens[targetId]; if (!t || (t.hidden && !isGM())) return;
+    const g = m.grid.size, p = t.size * g, cx = t.x + p / 2, cy = t.y + p / 2, r = p / 2 + 6 / v.z;
+    ctx.save(); ctx.strokeStyle = '#ff3344'; ctx.lineWidth = 2.5 / v.z; ctx.shadowColor = '#ff3344'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    for (const a of [0, 1, 2, 3]) { const ang = a * Math.PI / 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(ang) * (r - 8 / v.z), cy + Math.sin(ang) * (r - 8 / v.z)); ctx.lineTo(cx + Math.cos(ang) * (r + 10 / v.z), cy + Math.sin(ang) * (r + 10 / v.z)); ctx.stroke(); }
+    const mine = myTokenOnMap();
+    if (mine && mine.id !== t.id) {
+      const q = mine.size * g, x1 = mine.x + q / 2, y1 = mine.y + q / 2; const dist = N.tokenDistance(m, mine, t);
+      ctx.setLineDash([6 / v.z, 6 / v.z]); ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(cx, cy); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+      const label = '🎯 ' + dist + ' m'; ctx.font = 'bold ' + (14 / v.z) + 'px "Share Tech Mono", monospace'; const tw = ctx.measureText(label).width;
+      const lx = (x1 + cx) / 2 - tw / 2, ly = (y1 + cy) / 2 - 8 / v.z;
+      ctx.fillStyle = '#000d'; ctx.fillRect(lx - 4 / v.z, ly - 14 / v.z, tw + 8 / v.z, 19 / v.z); ctx.fillStyle = '#ff3344'; ctx.fillText(label, lx, ly);
+    }
+    ctx.restore();
+  }
+  function openAttack(weaponChoice) {
+    const m = activeMap(); if (!m) return toast('Put up a map first', true);
+    const sh = ammoSheet(); if (!sh) return toast('Make or import a character first', true);
+    const me2 = myTokenOnMap(); if (!me2) return toast('Place ' + sh.name + ' on the map first (Sheets → Place)', true);
+    const tgt = targetId && m.tokens[targetId];
+    if (!tgt || tgt.id === me2.id) return toast('Pick a target first: use the 🎯 tool, or right-click a token → Target', true);
+    const tsh = tgt.sheetId && S.sheets[tgt.sheetId]; const tName = (tsh && tsh.name) || tgt.name || 'target';
+    const dist = N.tokenDistance(m, me2, tgt);
+    const mm = modal('🎯 ' + sh.name + ' attacks ' + tName, true);
+    const wsel = el('select', { class: 'grow' }, ...sh.weapons.map((w, i) => el('option', { value: String(i), text: (w.name || 'Weapon') + ' · ' + (w.damage || '?') + (parseInt(w.shots, 10) ? ' · ' + (w.left ?? w.shots) + '/' + w.shots + ' rds' : '') , selected: String(weaponChoice) === String(i) })),
+      el('option', { value: 'unarmed:punch', text: 'Unarmed: Punch (1d6/2)', selected: weaponChoice === 'unarmed:punch' }), el('option', { value: 'unarmed:kick', text: 'Unarmed: Kick (1d6)' }), el('option', { value: 'unarmed:strike', text: 'Unarmed: Strike (1d6/2)' }));
+    if (weaponChoice === undefined && !sh.weapons.length) wsel.value = 'unarmed:punch';
+    const mode = el('select', null, el('option', { value: 'single', text: 'Single shot' }), el('option', { value: 'burst', text: '3-round burst (+3 close/medium)' }), el('option', { value: 'auto', text: 'Full auto' }));
+    const rounds = el('input', { type: 'number', value: 10, min: 1, max: 200, style: 'width:70px', title: 'Rounds fired' });
+    const called = el('select', null, el('option', { value: '', text: 'Random (roll 1d10)' }), ...N.LOCS.map(([k, l]) => el('option', { value: k, text: 'Called shot: ' + l + ' (−4)' })));
+    const cover = el('select', null, el('option', { value: '0', text: 'No cover' }), ...N.COVER.map(([n, v]) => el('option', { value: String(v), text: n + ' (SP ' + v + ')' })));
+    const ap = el('input', { type: 'checkbox' });
+    const extra = el('input', { value: '', placeholder: 'e.g. +2 or -3', style: 'width:110px', title: 'Anything else the DM says' });
+    const draft = N.clone(sh);
+    const chips = el('div');
+    const preview = el('div', { class: 'mono', style: 'background:var(--field);border:1px solid var(--line);padding:10px;line-height:1.7;white-space:pre-wrap;margin-top:10px' });
+    const modsStr = kind => activeMods(draft, kind).map(md => modValue(draft, md)).join('');
+    const update = () => {
+      const wv = wsel.value; const w = wv.startsWith('unarmed:') ? null : draft.weapons[Number(wv)];
+      const melee = !w || N.isMeleeWeapon(w);
+      mode.disabled = melee; rounds.style.display = mode.value === 'auto' && !melee ? '' : 'none';
+      const lines = ['Distance to ' + tName + ': ' + dist + ' m'];
+      if (melee) { lines.push(dist > 3 ? '⚠ Too far for melee: move next to them first' : 'Melee: your roll vs their REF + Dodge & Escape (they roll automatically)'); }
+      else {
+        const range = N.weaponRange(w, draft), band = N.rangeBand(dist, range);
+        lines.push('Weapon range ' + range + ' m → ' + (band < 0 ? '⚠ OUT OF RANGE (max ' + range * 2 + ' m)' : N.RANGE_BANDS[band][0] + ': you need ' + N.RANGE_BANDS[band][1] + ' or more'));
+        const mag = parseInt(w.shots, 10) || 0; if (mag) lines.push('Ammo: ' + (w.left ?? mag) + ' / ' + mag + (mode.value === 'burst' ? ' → uses 3' : mode.value === 'auto' ? ' → uses ' + rounds.value : ' → uses 1'));
+      }
+      const skillName = w ? (w.skill || N.weaponSkill(w.type)) : (((draft.skills.find(k => k.name === 'Martial Arts') || {}).value || 0) > ((draft.skills.find(k => k.name === 'Brawling') || {}).value || 0) ? 'Martial Arts' : 'Brawling');
+      const sk = (draft.skills.find(k => k.name.toLowerCase() === skillName.toLowerCase()) || { value: 0 }).value;
+      const tog = modsStr('hit');
+      lines.push('Your roll: 1d10! + REF ' + N.effStat(draft, 'REF') + ' + ' + skillName + ' ' + sk + (w && Number(w.wa) ? ' + WA ' + w.wa : '') + (called.value ? ' − 4 called shot' : '') + (tog ? ' ' + tog + ' (toggles)' : '') + (extra.value ? ' ' + extra.value : ''));
+      const dt = modsStr('dmg'); lines.push('Damage on a hit: ' + (w ? w.damage : (wv === 'unarmed:kick' ? '1d6' : '1d6 ÷ 2')) + (dt ? ' ' + dt + ' (toggles)' : '') + (Number(cover.value) ? ' · target behind SP ' + cover.value + ' cover' : '') + (ap.checked ? ' · AP (armor halved)' : ''));
+      if (tsh) lines.push(tName + ': SP ' + N.LOCS.map(([k, l]) => l + ' ' + (tsh.sp[k] || 0)).join(', ') + ' · BTM ' + N.derived(tsh).btm);
+      else if (tgt.sheetId) lines.push(tName + " is the DM's character: their armor and wounds are worked out by the DM's app.");
+      else lines.push(tName + ' has no character sheet, so damage is only reported (not applied).');
+      preview.textContent = lines.join('\n');
+      chips.textContent = ''; chips.append(el('div', { class: 'dim', style: 'font-size:.75rem;margin:6px 0 3px', text: 'Toggles (click to switch on/off):' }), modChips(draft, true, () => { saveSheetNow(draft); update(); }));
+    };
+    [wsel, mode, rounds, called, cover, ap, extra].forEach(x => x.addEventListener('input', update));
+    const go = () => {
+      const x = (extra.value || '').trim(); if (x && N.cleanModValue(x) === null) return toast('"' + x + '" isn\'t a modifier like +2 or -3', true);
+      const names = activeMods(draft, 'hit').map(md => md.name + ' ' + modValue(draft, md)).concat(x ? ['DM ' + N.cleanModValue(x)] : []);
+      request({ type: 'attack', mapId: m.id, attackerToken: me2.id, targetToken: tgt.id, weapon: wsel.value, mode: mode.value, rounds: Number(rounds.value) || 10,
+        called: called.value, cover: Number(cover.value) || 0, ap: ap.checked, hitMod: modsStr('hit') + (x ? N.cleanModValue(x) : ''), dmgMod: modsStr('dmg'), hitNote: names.join(', ') });
+      closeModal(); if (curTab !== 'chat') flashChat();
+    };
+    mm.append(el('div', { class: 'col' },
+      el('div', { class: 'row' }, el('label', { text: 'Weapon' }), wsel),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Fire' }), mode, rounds, el('label', { text: 'Aim' }), called),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Target cover' }), cover, el('label', { class: 'row' }, ap, 'Armor-piercing ammo'), el('label', { text: 'Extra' }), extra)),
+      chips, preview,
+      el('div', { class: 'row', style: 'margin-top:12px' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Cancel', onclick: closeModal }), el('button', { class: 'pink', style: 'padding:10px 22px', text: '🎯 ATTACK', onclick: go })));
+    update();
+  }
+  function combatMsgEl(m) {
+    const c = m.combat;
+    const d = el('div', { class: 'msg combat' + (c.hit ? ' hit' : ' miss'), style: '--c:' + (c.hit ? 'var(--red)' : 'var(--dim)') },
+      el('span', { class: 'when', text: timeStr(m.ts) }), el('div', { class: 'who', text: '🎯 ' + c.title }),
+      el('div', { class: 'total' }, c.hit ? (c.hits > 1 ? c.hits + ' HITS' : 'HIT') : 'MISS',
+        c.hit && c.wounds ? el('span', { class: 'badge b-fail', text: c.wounds + ' WOUND' + (c.wounds === 1 ? '' : 'S') }) : null,
+        c.hit && !c.wounds ? el('span', { class: 'badge b-vis', text: 'ARMOR STOPPED IT' }) : null,
+        c.crit ? el('span', { class: 'badge b-crit', text: 'CRITICAL!' }) : null, c.fumble ? el('span', { class: 'badge b-fum', text: 'FUMBLE' }) : null),
+      el('div', { class: 'brk', style: 'white-space:pre-wrap', text: c.lines.join('\n') }));
+    return d;
   }
 
   // ================= INSTALL AS AN APP =================
