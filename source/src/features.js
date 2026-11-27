@@ -125,6 +125,36 @@
     if (x) return { type: 'spotify', kind: x[1], id: x[2], uri: 'spotify:' + x[1] + ':' + x[2] };
     return null;
   }
+  // Spotify → YouTube, like Discord music bots: read the song names from Spotify, find each on YouTube.
+  const canLookup = () => !!(window.nctDesktop && window.nctDesktop.fetchText);
+  function parseLen(t) { const p = String(t || '').split(':').map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, x) => a * 60 + x, 0); }
+  async function spotifySongs(sk) {
+    const html = await window.nctDesktop.fetchText('https://open.spotify.com/embed/' + sk.kind + '/' + sk.id);
+    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) throw new Error("Couldn't read that Spotify link");
+    const e = JSON.parse(m[1]).props.pageProps.state.data.entity;
+    if (Array.isArray(e.trackList) && e.trackList.length) return { name: e.name || e.title || 'Spotify ' + sk.kind, songs: e.trackList.map(t => ({ title: t.title, artist: t.subtitle || '', ms: t.duration || 0 })) };
+    const artist = (e.artists || []).map(a => a.name).join(', ');
+    return { name: (artist ? artist + ' – ' : '') + (e.title || e.name || 'Song'), songs: [{ title: e.title || e.name, artist, ms: e.duration || 0 }] };
+  }
+  async function youtubeFind(song) {
+    const q = song.title + ' ' + song.artist + ' audio';
+    const html = await window.nctDesktop.fetchText('https://www.youtube.com/results?search_query=' + encodeURIComponent(q));
+    const parts = html.split('"videoRenderer":{"videoId":"').slice(1, 8);
+    const found = parts.map(c => ({ v: c.slice(0, 11), d: parseLen((c.slice(0, 4000).match(/"lengthText":\{[^}]*?\}\},"simpleText":"([\d:]+)"/) || [])[1]) })).filter(x => /^[\w-]{11}$/.test(x.v));
+    if (!found.length) return null;
+    const want = (song.ms || 0) / 1000;
+    if (want) { const close = found.find(x => x.d && Math.abs(x.d - want) <= 20); if (close) return close; }
+    return found.find(x => x.d && x.d < 1200) || found[0];
+  }
+  async function spotifyToYouTube(sk, onProgress) {
+    const info = await spotifySongs(sk);
+    const songs = info.songs.slice(0, 100), queue = new Array(songs.length).fill(null);
+    let next = 0, done = 0;
+    const worker = async () => { while (next < songs.length) { const i = next++; try { const r = await youtubeFind(songs[i]); if (r) queue[i] = { v: r.v, d: r.d || Math.round((songs[i].ms || 0) / 1000), n: (songs[i].artist ? songs[i].artist + ' – ' : '') + songs[i].title }; } catch (e) { } onProgress && onProgress(++done, songs.length); } };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    return { name: info.name, queue: queue.filter(Boolean), total: songs.length };
+  }
   const stream = { key: '', type: '', yt: null, sp: null, box: null, min: LS.get('nct-player-min', false) };
   function loadScriptOnce(src, readyName) {
     window.__nctScripts = window.__nctScripts || {};
@@ -134,8 +164,11 @@
   function streamBox() {
     if (stream.box) return stream.box;
     const b = el('div', { id: 'streamplayer', class: stream.min ? 'min' : '' },
-      el('div', { class: 'sp-head' }, el('span', { class: 'grow', id: 'spTitle', text: '♪' }), el('button', { class: 'small ghost', text: '–', title: 'Hide the player (music keeps playing)', onclick: () => { stream.min = true; LS.set('nct-player-min', true); b.classList.add('min'); renderNowPlaying(); } })),
-      el('div', { id: 'spSlot' }));
+      el('div', { class: 'sp-head' }, el('span', { class: 'grow', id: 'spTitle', text: '♪' }),
+        isGM() ? el('button', { class: 'small', id: 'spPause', text: '⏸', title: 'Pause for everyone', onclick: () => request({ type: 'music.pause' }) }) : null,
+        el('button', { class: 'small ghost', text: '–', title: 'Hide the player (music keeps playing)', onclick: () => { stream.min = true; LS.set('nct-player-min', true); b.classList.add('min'); renderNowPlaying(); } })),
+      el('div', { class: 'sp-vol' }, el('span', { text: '🔊' }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: vol.music, title: 'Your music volume (only you)', oninput: ev => { vol.music = Number(ev.target.value); LS.set('nct-vol', vol); applyMusic(); } })),
+      el('div', { id: 'spSlot' }), el('div', { class: 'sp-shield', title: isGM() ? 'Use ⏸ above, or the Audio tab' : 'Only the DM can pause or change the music. Use 🔊 for your volume.' }));
     document.body.appendChild(b); stream.box = b; return b;
   }
   function showStreamPlayer() { stream.min = false; LS.set('nct-player-min', false); if (stream.box) stream.box.classList.remove('min'); renderNowPlaying(); }
@@ -153,14 +186,27 @@
     stopStream(); musicEl.pause(); stream.key = key; stream.type = sk.type;
     const b = streamBox(); $('#spTitle', b).textContent = '♪ ' + m.track.name;
     const slot = el('div'); $('#spSlot', b).append(slot);
+    b.style.setProperty('--shield-h', (sk.type === 'youtube' ? 158 : (sk.kind === 'track' || sk.kind === 'episode' ? 80 : 152)) + 'px');
     if (sk.type === 'youtube') {
       const YT = await loadScriptOnce('https://www.youtube.com/iframe_api', 'onYouTubeIframeAPIReady').then(() => window.YT);
       if (!YT || !YT.Player || stream.key !== key) { if (!YT) renderNowPlaying("Couldn't reach YouTube"); return; }
-      const vars = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin.startsWith('http') ? location.origin : undefined };
+      const vars = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1, fs: 0, origin: location.origin.startsWith('http') ? location.origin : undefined };
       if (sk.list) { vars.listType = 'playlist'; vars.list = sk.list; vars.loop = 1; }
-      stream.yt = new YT.Player(slot, { width: 280, height: 158, videoId: sk.id || undefined, playerVars: vars, events: {
-        onReady: e => { const p = e.target; p.setVolume(streamVolume(m)); if (vol.mute) p.mute(); const d = p.getDuration() || 0; let t = streamPos(m); if (m.loop && d > 0) t = t % d; if (t > 1) p.seekTo(t, true); p.playVideo(); watchBlocked(() => p.getPlayerState && p.getPlayerState() === 1); },
-        onStateChange: e => { if (e.data === 0 && m.loop && sk.id && !sk.list) { e.target.seekTo(0, true); e.target.playVideo(); } if (e.data === 1 && audioBlocked) { audioBlocked = false; renderNowPlaying(); } },
+      const queue = (m.track.queue || []).filter(x => x && x.v);
+      // where everyone is in the song list right now
+      let qi = 0, qt = streamPos(m);
+      if (queue.length > 1) { const total = queue.reduce((a, x) => a + (x.d || 0), 0); if (total > 0) { if (m.loop) qt = qt % total; while (qi < queue.length - 1 && qt >= (queue[qi].d || 0)) { qt -= queue[qi].d || 0; qi++; } } }
+      const firstId = queue.length ? queue[qi].v : (sk.id || undefined);
+      stream.yt = new YT.Player(slot, { width: 280, height: 158, videoId: firstId, playerVars: vars, events: {
+        onReady: e => {
+          const p = e.target; p.setVolume(streamVolume(m)); if (vol.mute) p.mute();
+          if (queue.length > 1) { p.loadPlaylist(queue.map(x => x.v), qi, Math.max(0, qt)); p.setLoop(!!m.loop); }
+          else { const d = p.getDuration() || 0; let t = streamPos(m); if (m.loop && d > 0) t = t % d; if (t > 1) p.seekTo(t, true); p.playVideo(); }
+          watchBlocked(() => p.getPlayerState && p.getPlayerState() === 1);
+        },
+        onStateChange: e => { if (e.data === 2 && S && S.audio.music.playing) { try { e.target.playVideo(); } catch (er) { } }
+          if (e.data === 1 && queue.length > 1) { try { const i = e.target.getPlaylistIndex(); if (queue[i]) $('#spTitle', stream.box).textContent = '♪ ' + queue[i].n; } catch (er) { } }
+          if (e.data === 0 && m.loop && sk.id && !sk.list && queue.length <= 1) { e.target.seekTo(0, true); e.target.playVideo(); } if (e.data === 1 && audioBlocked) { audioBlocked = false; renderNowPlaying(); } },
         onError: () => renderNowPlaying("YouTube won't play this one here (the owner may block embedding)") } });
     } else {
       const API = await loadScriptOnce('https://open.spotify.com/embed/iframe-api/v1', 'onSpotifyIframeApiReady');
@@ -207,6 +253,7 @@
     const box = $('#nowplaying'); box.textContent = '';
     const m = S && S.audio && S.audio.music;
     if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Tap to turn on sound', onclick: () => { audioBlocked = false; if (stream.type) resumeStream(); else tryPlay(musicEl); renderNowPlaying(); } })); return; }
+    if (m && m.paused && m.track) { box.classList.remove('hidden'); box.append('⏸ ' + m.track.name + ' (paused)'); return; }
     if (!m || !m.playing || !m.track) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden'); box.append('♪ ' + (msg || m.track.name));
     if (stream.type && stream.min) box.append(el('button', { class: 'small ghost', text: 'Show player', onclick: showStreamPlayer }));
@@ -253,14 +300,28 @@
       if (sk && kind === 'sound') { toast('YouTube and Spotify links work for music. For sound effects, upload a file or use a direct .mp3 link.', true); return; }
       if (!sk && /youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast("That link isn't a song, video or playlist. Copy the link from the Share button.", true); return; }
       if (sk && sk.type === 'spotify') u = 'https://open.spotify.com/' + sk.kind + '/' + sk.id;
+      if (sk && sk.type === 'spotify' && canLookup()) {
+        const typed = nm.value.trim(); nm.value = ''; url.value = '';
+        toast('Reading the Spotify link…');
+        spotifyToYouTube(sk, (d, n) => { if (n > 1 && (d % 5 === 0 || d === n)) toast('Finding songs on YouTube: ' + d + ' / ' + n); })
+          .then(r => {
+            if (!r.queue.length) return toast("Couldn't find those songs on YouTube", true);
+            request({ type: 'audio.track.add', track: { name: typed || r.name, kind: 'music', url: 'https://www.youtube.com/watch?v=' + r.queue[0].v, queue: r.queue, src: u } });
+            toast('Added ' + (typed || r.name) + (r.total > 1 ? ' (' + r.queue.length + ' of ' + r.total + ' songs found)' : ''));
+          })
+          .catch(e => toast("Couldn't read that Spotify link: " + (e && e.message || e), true));
+        return;
+      }
       if (sk && !nm.value.trim()) nm.value = sk.type === 'youtube' ? (sk.list && !sk.id ? 'YouTube playlist' : 'YouTube video') : 'Spotify ' + sk.kind; request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
     box.append(el('div', { class: 'section-h', text: 'Music (plays for everyone, loops)' }),
       el('div', { class: 'col' }, nm, url, el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '+ Add music link', onclick: () => addLink('music') }), el('button', { class: 'grow', text: '⬆ Upload music', onclick: () => addAudioFiles('music') }))),
       el('div', { class: 'setrow' }, el('span', { text: 'Music volume for everyone' }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: m.volume ?? 0.6, onchange: e => request({ type: 'music.volume', volume: Number(e.target.value) }) })));
-    if (m.playing && m.track) box.append(el('div', { class: 'row' }, el('span', { class: 'grow', text: '♪ Now playing: ' + m.track.name }), el('button', { class: 'danger', text: '■ Stop', onclick: () => request({ type: 'music.stop' }) })));
-    box.append(el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Links can be YouTube videos or playlists, Spotify songs, albums or playlists, or an mp3 (Dropbox and Google Drive share links work). Spotify plays whole songs only for people logged in to Spotify; everyone else hears 30-second previews.' }));
+    if ((m.playing || m.paused) && m.track) box.append(el('div', { class: 'row' }, el('span', { class: 'grow', text: (m.paused ? '⏸ Paused: ' : '♪ Now playing: ') + m.track.name }),
+      m.paused ? el('button', { class: 'primary', text: '▶ Play', onclick: () => request({ type: 'music.resume' }) }) : el('button', { text: '⏸ Pause', onclick: () => request({ type: 'music.pause' }) }),
+      el('button', { class: 'danger', text: '■ Stop', onclick: () => request({ type: 'music.stop' }) })));
+    box.append(el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Links can be YouTube videos or playlists, Spotify songs, albums or playlists, or an mp3 (Dropbox and Google Drive share links work). Spotify links are played from YouTube, so everyone hears whole songs (in the web version, Spotify plays 30-second previews for people not logged in).' }));
     for (const t of music) box.append(el('div', { class: 'track' + (m.playing && m.track && m.track.id === t.id ? ' playing' : '') },
-      el('span', { class: 'nm', text: (streamKind(t.url) ? (streamKind(t.url).type === 'youtube' ? '▶️ ' : '🟢 ') : t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
+      el('span', { class: 'nm', text: (t.src ? '🟢▶️ ' : streamKind(t.url) ? (streamKind(t.url).type === 'youtube' ? '▶️ ' : '🟢 ') : t.url ? '🔗 ' : '♪ ') + t.name + (t.queue && t.queue.length > 1 ? ' · ' + t.queue.length + ' songs' : ''), title: t.src ? 'Spotify link, played from YouTube' : (t.url || 'uploaded file') }),
       el('button', { class: 'small primary', text: '▶', title: 'Play for everyone', onclick: () => request({ type: 'music.play', id: t.id, loop: true }) }),
       el('button', { class: 'small ghost', text: '✎', title: 'Rename', onclick: () => askText('Rename', t.name, n => request({ type: 'audio.track.rename', id: t.id, name: n })) }),
       el('button', { class: 'small ghost danger', text: '✕', onclick: () => askConfirm('Delete "' + t.name + '"?', '', 'Delete', () => { request({ type: 'audio.track.delete', id: t.id }); if (t.file) DB.del(t.id, 'audio').catch(() => { }); }) })));

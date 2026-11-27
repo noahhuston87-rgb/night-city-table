@@ -378,3 +378,9 @@ table.wt input{width:100%;padding:2px 4px}
 /* opened from an invite link: just the name and the Join button */
 #home.invited #hostCard, #home.invited #helpBox, #home.invited #installBar, #home.invited #fileNotice { display:none !important; }
 #home.invited .cards { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+
+#streamplayer #spSlot{position:relative}
+#streamplayer .sp-shield{position:absolute;left:0;right:0;bottom:0;height:var(--shield-h,160px);background:transparent;cursor:not-allowed}
+#streamplayer .sp-vol{display:flex;align-items:center;gap:6px;padding:0 8px 4px;font-size:.8rem}
+#streamplayer .sp-vol input{flex:1}
+#streamplayer{position:fixed}

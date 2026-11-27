@@ -428,7 +428,11 @@
     return { mode, ids: mode === 'some' ? (Array.isArray(v.ids) ? v.ids : []).filter(id => state.players[id]).slice(0, 50) : [] };
   }
   function cleanTrack(t) {
-    return { id: str(t.id || uid(), 20), name: str(t.name || 'Track', 80), kind: t.kind === 'sound' ? 'sound' : 'music', url: /^https:\/\//.test(String(t.url || '')) ? str(t.url, 2000) : '', file: !!t.file, size: clamp(t.size || 0, 0, 1e9) };
+    const out = { id: str(t.id || uid(), 20), name: str(t.name || 'Track', 80), kind: t.kind === 'sound' ? 'sound' : 'music', url: /^https:\/\//.test(String(t.url || '')) ? str(t.url, 2000) : '', file: !!t.file, size: clamp(t.size || 0, 0, 1e9) };
+    // songs found on YouTube for a Spotify link: [{ v: video id, d: seconds, n: name }]
+    if (Array.isArray(t.queue)) { const q = t.queue.filter(x => x && /^[\w-]{11}$/.test(String(x.v))).slice(0, 100).map(x => ({ v: String(x.v), d: clamp(Number(x.d) || 0, 0, 36000), n: str(x.n || '', 120) })); if (q.length) out.queue = q; }
+    if (/^https:\/\/open\.spotify\.com\//.test(String(t.src || ''))) out.src = str(t.src, 300);
+    return out;
   }
 
   // ---------- host: turn a request into committed ops ----------
@@ -598,9 +602,18 @@
         return out;
       case 'music.play': {
         if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such track');
-        out.ops.push({ type: 'music.set', music: { playing: true, track: { id: t.id, name: t.name, url: t.url, file: t.file }, startedAt: Date.now(), offset: clamp(req.offset || 0, 0, 1e6), loop: req.loop !== false, volume: clamp(req.volume ?? state.audio.music.volume ?? 0.6, 0, 1) } }); return out;
+        out.ops.push({ type: 'music.set', music: { playing: true, track: Object.assign({ id: t.id, name: t.name, url: t.url, file: t.file }, t.queue ? { queue: t.queue } : {}), startedAt: Date.now(), offset: clamp(req.offset || 0, 0, 1e6), loop: req.loop !== false, volume: clamp(req.volume ?? state.audio.music.volume ?? 0.6, 0, 1) } }); return out;
       }
-      case 'music.stop': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { playing: false }) }); return out;
+      case 'music.stop': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { playing: false, paused: false }) }); return out;
+      case 'music.pause': { // DM only: remember where the song is so Resume carries on from there
+        if (!isGM) return deny('Only the DM can pause the music'); upgrade(state); const m = state.audio.music; if (!m.playing || !m.track) return out;
+        const pos = (m.offset || 0) + Math.max(0, (Date.now() - (m.startedAt || Date.now())) / 1000);
+        out.ops.push({ type: 'music.set', music: Object.assign({}, m, { playing: false, paused: true, offset: pos }) }); return out;
+      }
+      case 'music.resume': {
+        if (!isGM) return deny('Only the DM can play the music'); upgrade(state); const m = state.audio.music; if (!m.paused || !m.track) return out;
+        out.ops.push({ type: 'music.set', music: Object.assign({}, m, { playing: true, paused: false, startedAt: Date.now() }) }); return out;
+      }
       case 'music.volume': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { volume: clamp(req.volume, 0, 1) }) }); return out;
       case 'sound.play': {
         if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such sound');

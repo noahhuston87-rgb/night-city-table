@@ -74,6 +74,13 @@ ipcMain.on('nct:bookmark-page', (e, href) => {
 // navigating to https://nct-import.local/#<data>, which is caught here and given to the game window
 let siteWin = null, siteScript = '';
 ipcMain.on('nct:site-script', e => { e.returnValue = siteScript; });
+// Spotify → YouTube lookups for music (only these two sites)
+ipcMain.handle('nct:fetch-text', async (e, url) => {
+  const u = new URL(String(url));
+  if (u.protocol !== 'https:' || !['open.spotify.com', 'www.youtube.com'].includes(u.hostname)) throw new Error('not allowed');
+  const r = await net.fetch(u.href, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36', 'Accept-Language': 'en-US,en;q=0.9', 'Cookie': 'CONSENT=YES+1' } });
+  return await r.text();
+});
 ipcMain.on('nct:site-import', (e, script) => {
   siteScript = String(script || '');
   if (siteWin && !siteWin.isDestroyed()) { siteWin.focus(); return; }

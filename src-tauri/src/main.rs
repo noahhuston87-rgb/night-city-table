@@ -220,6 +220,26 @@ fn close_now(window: tauri::WebviewWindow) {
     let _ = window.destroy();
 }
 
+// ---------------- music lookups ----------------
+// For Spotify links the DM's app reads the song names from Spotify's public embed page and finds each song
+// on YouTube (like music bots do). Only these two sites can be fetched.
+#[tauri::command]
+fn fetch_text(url: String) -> Result<String, String> {
+    let u = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
+    let host = u.host_str().unwrap_or("");
+    if u.scheme() != "https" || !(host == "open.spotify.com" || host == "www.youtube.com") {
+        return Err("not allowed".into());
+    }
+    let resp = ureq::get(u.as_str())
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36")
+        .set("Accept-Language", "en-US,en;q=0.9")
+        .set("Cookie", "CONSENT=YES+1")
+        .timeout(std::time::Duration::from_secs(20))
+        .call()
+        .map_err(|e| e.to_string())?;
+    resp.into_string().map_err(|e| e.to_string())
+}
+
 // ---------------- import bookmark → app ----------------
 // The "Send to Night City Table" bookmark reads the character on cyberpunk2020character.com and opens
 // http://127.0.0.1:47820/import?d=<character> in a small window. This tiny server (only reachable from this
@@ -264,7 +284,7 @@ fn handle_import(app: AppHandle, mut s: std::net::TcpStream) {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![clip_read, clip_write, open_external, bookmark_page, close_now, update_install, open_site_import])
+        .invoke_handler(tauri::generate_handler![fetch_text, clip_read, clip_write, open_external, bookmark_page, close_now, update_install, open_site_import])
         .setup(|app| {
             { let h = app.handle().clone(); std::thread::spawn(move || import_server(h)); }
             let version = app.package_info().version.to_string();

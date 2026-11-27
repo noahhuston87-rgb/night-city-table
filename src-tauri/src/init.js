@@ -22,6 +22,7 @@
     closeNow: function () { return inv('close_now'); },
     canAutoUpdate: AUTO_UPDATE,
     openSiteImport: function (script) { return inv('open_site_import', { script: String(script) }); },
+    fetchText: function (url) { return inv('fetch_text', { url: String(url) }); },
     onSiteCharacter: function (f) { if (typeof f === 'function') siteListeners.push(f); },
     // downloads and installs the new version, then the app restarts by itself
     installUpdate: function (onProgress) {

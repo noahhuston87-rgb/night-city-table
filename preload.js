@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('nctDesktop', {
   openExternal: url => ipcRenderer.send('nct:open-external', String(url)),
   openBookmarkPage: href => ipcRenderer.send('nct:bookmark-page', String(href)),
   openSiteImport: script => ipcRenderer.send('nct:site-import', String(script)),
+  fetchText: url => ipcRenderer.invoke('nct:fetch-text', String(url)),
   onSiteCharacter: fn => { if (typeof fn === 'function') ipcRenderer.on('nct:site-character', (e, txt) => { try { fn(txt); } catch (er) { } }); }
 });
