@@ -2341,34 +2341,21 @@ window.peerReady = new Promise(function (resolve) {
   function siteImportScript() { return window.nctGrab.toString() + ';\n(' + window.nctSiteHelper.toString() + ')();'; }
   function openImportHelp() {
     const m = modal('Import from cyberpunk2020character.com');
-    if (DESKTOP && window.nctDesktop.openSiteImport) {
-      m.append(el('p', { text: 'The app opens the character site in its own window with a pink bar at the top.' }),
-        el('ol', { class: 'steps' },
-          el('li', null, 'Click the button below.'),
-          el('li', null, 'In that window, open your character the way you normally do. If you use a join or character link, paste it into the bar at the top and press GO.'),
-          el('li', null, 'Once you can see your stats, click ', el('b', { text: 'SEND MY CHARACTER' }), ' in the pink bar. Your character pops up here, ready to add.')),
-        el('button', { class: 'primary', style: 'width:100%;padding:12px', text: 'Open cyberpunk2020character.com', onclick: () => { window.nctDesktop.openSiteImport(siteImportScript()); closeModal(); toast('Opening the character site…'); } }),
-        el('div', { class: 'section-h', style: 'margin-top:18px', text: 'Other ways' }));
+    const file = el('input', { type: 'file', accept: '.json', class: 'hidden', onchange: async e => { const f = e.target.files[0]; if (!f) return; try { const v = (await f.text()).trim(); handleIncomingCharacter(JSON.parse(v.startsWith('NCT1:') ? v.slice(5) : v)); } catch (er) { toast("That file isn't a character sheet.", true); } } });
+    const fileLink = el('p', { class: 'dim', style: 'font-size:13px;margin-top:14px' }, 'Have a Night City Table sheet file saved? ', el('a', { href: '#', text: 'Open it here', onclick: e => { e.preventDefault(); file.click(); } }), '.', file);
+    if (!(DESKTOP && window.nctDesktop.openSiteImport)) {
+      m.append(el('p', { text: 'Importing from cyberpunk2020character.com works in the Night City Table app, which opens the character site in its own window.' }),
+        el('p', { class: 'dim', text: "You're playing in a web browser, so install the free app (Windows, Mac or Linux), join the game with the same code, and press Import there." }),
+        el('button', { class: 'primary', style: 'width:100%;padding:12px', text: 'Get the Night City Table app', onclick: () => window.open('https://github.com/noahhuston87-rgb/night-city-table/releases/latest', '_blank', 'noopener') }), fileLink);
+      return;
     }
-    const bm = DESKTOP ? el('button', { class: 'pink', text: 'Open the button in my web browser', onclick: () => window.nctDesktop.openBookmarkPage(bookmarkletHref()) })
-      : el('a', { class: 'bm', href: bookmarkletHref(), onclick: e => { e.preventDefault(); toast("Drag this button to your bookmarks bar (don't click it here)"); } }, '⇩ Send to Night City Table');
-    m.append(
-      el('p', { class: 'dim', text: "Character links on that site are private, so the import has to run from a browser that's logged in to your character. A bookmark button does it in one click." }),
+    m.append(el('p', { text: 'The app opens the character site in its own window with a pink bar at the top.' }),
       el('ol', { class: 'steps' },
-        el('li', null, 'Show your bookmarks bar (press ', el('b', { text: 'Ctrl+Shift+B' }), ', or ', el('b', { text: '⌘+Shift+B' }), ' on Mac).'),
-        DESKTOP ? el('li', null, 'Click this. It opens a page in your normal web browser (Chrome, Edge…). There, ', el('b', { text: 'drag the pink button onto your bookmarks bar' }), '. You only do this once:', el('div', { style: 'margin:10px 0' }, bm))
-          : el('li', null, el('b', { text: 'Drag this pink button' }), ' up onto the bookmarks bar. You only do this once:', el('div', { style: 'margin:10px 0' }, bm)),
-        el('li', null, 'Open your character on ', el('a', { href: 'https://cyberpunk2020character.com', target: '_blank', rel: 'noopener', text: 'cyberpunk2020character.com' }), ' the way you normally do, so you can see your stats.'),
-        el('li', null, 'Click the ', el('b', { text: 'Send to Night City Table' }), ' bookmark. ', DESKTOP ? 'It copies your character. Switch back to this app and it pops up by itself, ready to add.' : 'Your character pops up here, ready to add.')),
-      (ONLINE || DESKTOP) ? null : el('p', { class: 'notice', text: "Because this file is running from your computer, the button will copy your character instead of sending it. After clicking it, paste below." }),
-      el('div', { class: 'section-h', text: 'OR PASTE A CHARACTER' }),
-      el('p', { class: 'dim', style: 'font-size:14px', text: 'The button also copies your character, so if the pop-up gets blocked, paste it here (Ctrl+V). A downloaded Night City Table sheet file also works.' }));
-    const ta = el('textarea', { style: 'width:100%;height:80px', placeholder: 'Paste here…' });
-    const file = el('input', { type: 'file', accept: '.json', class: 'hidden', onchange: async e => { const f = e.target.files[0]; if (f) { ta.value = await f.text(); go(); } } });
-    const go = () => { try { const v = ta.value.trim(); const obj = JSON.parse(v.startsWith('NCT1:') ? v.slice(5) : v); handleIncomingCharacter(obj); } catch (e) { toast("That doesn't look like a character. Try the button again.", true); } };
-    m.append(ta, file, el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'ghost', text: 'Open sheet file…', onclick: () => file.click() }), el('div', { class: 'grow' }),
-      el('button', { class: 'small ghost', text: 'Copy button code', title: 'For browsers where dragging does not work: make a new bookmark and paste this as its address', onclick: () => copyText(bookmarkletHref()) }),
-      el('button', { class: 'primary', text: 'Import', onclick: go })));
+        el('li', null, 'Click the button below.'),
+        el('li', null, 'In that window, log in and open your character the way you normally do. If you use a join or character link, paste it into the bar at the top and press GO.'),
+        el('li', null, 'Once you can see your stats, click ', el('b', { text: 'SEND MY CHARACTER' }), ' in the pink bar. Your character pops up here, ready to add.')),
+      el('button', { class: 'primary', style: 'width:100%;padding:12px', text: 'Open cyberpunk2020character.com', onclick: () => { window.nctDesktop.openSiteImport(siteImportScript()); closeModal(); toast('Opening the character site…'); } }),
+      fileLink);
   }
   function toSheet(obj) {
     if (obj && obj.type === 'nct-character') return N.fromCP2020Site(obj.data, { playerId: obj.playerId });
