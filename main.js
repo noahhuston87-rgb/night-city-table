@@ -70,6 +70,24 @@ ipcMain.on('nct:bookmark-page', (e, href) => {
   shell.openPath(f);
 });
 
+// character import window (same idea as the Windows/Mac app): the helper bar sends the character by
+// navigating to https://nct-import.local/#<data>, which is caught here and given to the game window
+let siteWin = null, siteScript = '';
+ipcMain.on('nct:site-script', e => { e.returnValue = siteScript; });
+ipcMain.on('nct:site-import', (e, script) => {
+  siteScript = String(script || '');
+  if (siteWin && !siteWin.isDestroyed()) { siteWin.focus(); return; }
+  siteWin = new BrowserWindow({ width: 1280, height: 860, title: 'Import a character: cyberpunk2020character.com', autoHideMenuBar: true,
+    webPreferences: { preload: path.join(__dirname, 'site-preload.js'), contextIsolation: true, sandbox: false, nodeIntegration: false } });
+  const catchSend = (ev, url) => {
+    try { const u = new URL(url); if (u.hostname === 'nct-import.local') { ev.preventDefault(); const d = u.searchParams.get('d') || decodeURIComponent(u.hash.slice(1)); if (win && d) { win.webContents.send('nct:site-character', d); win.focus(); } } } catch (er) { }
+  };
+  siteWin.webContents.on('will-navigate', catchSend);
+  siteWin.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  siteWin.on('closed', () => { siteWin = null; });
+  siteWin.loadURL('https://cyberpunk2020character.com/');
+});
+
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 app.whenReady().then(() => {
   protocol.handle('app', req => {

@@ -84,7 +84,13 @@ function nctGrab(APP) {
   }
 
   ui('Reading your character…', true);
-  var ch = fromReact();
+  function fromCapture() {
+    var cap = window.__nctCap; if (!cap || !cap.chars) return null;
+    if (playerId && cap.chars[playerId] && score(cap.chars[playerId])) return cap.chars[playerId];
+    var best = null, bs = 0; for (var k in cap.chars) { var sc = score(cap.chars[k]); if (sc > bs) { bs = sc; best = cap.chars[k]; } }
+    return best;
+  }
+  var ch = fromCapture() || fromReact();
   (ch ? Promise.resolve(ch) : fromServer()).then(function (c) {
     if (!c) { ui('Couldn\'t find a character on this page. Open your character sheet on this site (so you can see your stats), then click the bookmark again.', true); return; }
     var data = JSON.parse(JSON.stringify(c, function (k, v) { return (typeof v === 'string' && v.length > 700000) ? undefined : v; }));
@@ -94,6 +100,10 @@ function nctGrab(APP) {
     var copied = false;
     try { navigator.clipboard.writeText(text).then(function () { copied = true; }, function () { }); } catch (e) { }
     var name = esc(data.name || 'your character');
+    if (APP === '@desktop') { // the Night City Table app's own import window picks this up
+      location.href = 'https://nct-import.local/?d=' + encodeURIComponent(JSON.stringify(payload));
+      ui('<b>' + name + '</b> sent to Night City Table ✓ You can close this window, or send another character.', true); return;
+    }
     if (!APP) { ui('<b>' + name + '</b> copied! Switch to the Night City Table app and it pops up by itself. (If it doesn\'t: Sheets → Import → <b>Paste</b>.)', true); return; }
     var w = null; try { w = window.open(APP + '#import', 'nct_import'); } catch (e) { }
     if (!w) {
@@ -105,4 +115,42 @@ function nctGrab(APP) {
     window.addEventListener('message', function (e) { if (e.data && e.data.type === 'nct-ack') { clearInterval(iv); ui('<b>' + name + '</b> sent to Night City Table ✓'); } });
     ui('Sending <b>' + name + '</b> to Night City Table…');
   });
+}
+
+/* Runs in the desktop app's import window before the site loads: records character data the site receives
+   from its own server, and adds a bar with a button to send the character to Night City Table. */
+function nctSiteHelper() {
+  if (window.__nctCap) return;
+  var cap = window.__nctCap = { chars: {} };
+  function add(o) { if (o && o.id != null && (o.attributes || o.skills)) cap.chars[o.id] = Object.assign(cap.chars[o.id] || {}, o); }
+  function take(ev, d) {
+    try {
+      if (!d) return;
+      if (ev === 'character:data') { var id = d.playerId != null ? d.playerId : d.id; if (id != null) cap.chars[id] = Object.assign(cap.chars[id] || {}, d, { id: id }); }
+      if (ev === 'player:field_update' && d.playerId != null && d.fields) { cap.chars[d.playerId] = Object.assign(cap.chars[d.playerId] || { id: d.playerId }, d.fields); }
+      var list = d.players || (d.gameState && d.gameState.players) || (d.newState && d.newState.players) || (Array.isArray(d) ? d : null);
+      if (list) for (var i = 0; i < list.length; i++) add(list[i]);
+    } catch (e) { }
+  }
+  function parse(txt) { if (typeof txt !== 'string') return; var ps = txt.split('\x1e'); for (var i = 0; i < ps.length; i++) { var p = ps[i]; if (p.indexOf('42') === 0) { try { var a = JSON.parse(p.slice(2).replace(/^\d+/, '')); take(a[0], a[1]); } catch (e) { } } } }
+  var WS = window.WebSocket;
+  var Wrapped = function (u, pr) { var ws = pr !== undefined ? new WS(u, pr) : new WS(u); ws.addEventListener('message', function (e) { parse(e.data); }); return ws; };
+  Wrapped.prototype = WS.prototype; Wrapped.CONNECTING = 0; Wrapped.OPEN = 1; Wrapped.CLOSING = 2; Wrapped.CLOSED = 3; window.WebSocket = Wrapped;
+  var open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) { var x = this; if (String(u).indexOf('/socket.io/') >= 0) x.addEventListener('load', function () { try { parse(x.responseText); } catch (e) { } }); return open.apply(this, arguments); };
+  var f = window.fetch;
+  window.fetch = function (input) { var u = String(input && input.url || input); return f.apply(this, arguments).then(function (r) { if (u.indexOf('/socket.io/') >= 0) { try { r.clone().text().then(parse); } catch (e) { } } return r; }); };
+  function bar() {
+    if (document.getElementById('nct-bar')) return;
+    var b = document.createElement('div'); b.id = 'nct-bar';
+    b.setAttribute('style', 'position:fixed;left:0;right:0;top:0;z-index:2147483646;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#000;border-bottom:2px solid #ff2a6d;box-shadow:0 0 18px #ff2a6d;font:14px system-ui,sans-serif;color:#e6f4ff');
+    b.innerHTML = '<b style="color:#ff2a6d">NIGHT CITY TABLE IMPORT</b><span style="opacity:.8">Open your character on this site (use your normal link), then:</span>' +
+      '<button id="nct-send" style="background:#ff2a6d;color:#fff;border:0;padding:7px 14px;font-weight:700;cursor:pointer">SEND MY CHARACTER</button>' +
+      '<span style="flex:1"></span><input id="nct-url" placeholder="Paste a link from the site (join / character link)" style="width:300px;background:#111;color:#fff;border:1px solid #555;padding:5px"><button id="nct-go" style="background:#222;color:#fff;border:1px solid #555;padding:6px 10px;cursor:pointer">GO</button>';
+    document.body.appendChild(b); document.body.style.marginTop = (b.offsetHeight + 4) + 'px';
+    document.getElementById('nct-send').onclick = function () { nctGrab('@desktop'); };
+    document.getElementById('nct-go').onclick = function () { var u = document.getElementById('nct-url').value.trim(); if (/^https:\/\/(www\.)?cyberpunk2020character\.com\//.test(u)) location.href = u; else alert('Paste a link that starts with https://cyberpunk2020character.com/'); };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bar); else bar();
+  setInterval(bar, 1500);
 }

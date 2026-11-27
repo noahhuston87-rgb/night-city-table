@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "site-preload.js",
       "app/**/*",
       "package.json"
     ],

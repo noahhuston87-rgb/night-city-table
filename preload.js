@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('nctDesktop', {
   readClipboard: () => ipcRenderer.invoke('nct:clip-read'),
   writeClipboard: t => ipcRenderer.send('nct:clip-write', String(t)),
   openExternal: url => ipcRenderer.send('nct:open-external', String(url)),
-  openBookmarkPage: href => ipcRenderer.send('nct:bookmark-page', String(href))
+  openBookmarkPage: href => ipcRenderer.send('nct:bookmark-page', String(href)),
+  openSiteImport: script => ipcRenderer.send('nct:site-import', String(script)),
+  onSiteCharacter: fn => { if (typeof fn === 'function') ipcRenderer.on('nct:site-character', (e, txt) => { try { fn(txt); } catch (er) { } }); }
 });

@@ -3,7 +3,7 @@
   if (window.nctDesktop) return;
   var REPO = '__REPO__', VERSION = '__VERSION__', AUTO_UPDATE = __AUTO_UPDATE__;
   function inv(cmd, args) { return window.__TAURI__.core.invoke(cmd, args || {}); }
-  var update = { available: false }, updateListeners = [], closeHandler = null;
+  var update = { available: false }, updateListeners = [], closeHandler = null, siteListeners = [];
   function newer(a, b) {
     var x = a.split('.').map(Number), y = b.split('.').map(Number);
     for (var i = 0; i < 3; i++) { if ((x[i] || 0) > (y[i] || 0)) return true; if ((x[i] || 0) < (y[i] || 0)) return false; }
@@ -21,6 +21,8 @@
     onCloseRequested: function (f) { closeHandler = f; },
     closeNow: function () { return inv('close_now'); },
     canAutoUpdate: AUTO_UPDATE,
+    openSiteImport: function (script) { return inv('open_site_import', { script: String(script) }); },
+    onSiteCharacter: function (f) { if (typeof f === 'function') siteListeners.push(f); },
     // downloads and installs the new version, then the app restarts by itself
     installUpdate: function (onProgress) {
       return new Promise(function (resolve, reject) {
@@ -37,6 +39,7 @@
     setTimeout(function () { whenTauri(fn, (tries || 0) + 1); }, 50);
   }
   whenTauri(function () {
+    window.__TAURI__.event.listen('nct-site-character', function (e) { siteListeners.forEach(function (f) { try { f(e.payload); } catch (er) { } }); });
     window.__TAURI__.event.listen('nct-close-requested', function () { if (closeHandler) { try { closeHandler(); } catch (e) { inv('close_now'); } } else inv('close_now'); });
   });
   // tell the game when a newer version is on GitHub

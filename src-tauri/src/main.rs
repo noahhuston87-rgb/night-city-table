@@ -9,7 +9,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 const REPO: &str = "noahhuston87-rgb/night-city-table";
 const INIT_JS: &str = include_str!("init.js");
@@ -166,6 +166,55 @@ fn update_install(app: AppHandle, version: String) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------- character import window ----------------
+// Opens cyberpunk2020character.com in its own window. A helper script (from the game) adds a
+// "SEND MY CHARACTER" bar; sending navigates to https://nct-import.local/?d=<data>, which is caught
+// here, never actually loaded, and handed to the game window.
+
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let hex = |c: u8| -> Option<u8> { (c as char).to_digit(16).map(|d| d as u8) };
+    let mut out: Vec<u8> = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let (Some(h), Some(l)) = (hex(b[i + 1]), hex(b[i + 2])) { out.push(h * 16 + l); i += 3; continue; }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+#[tauri::command]
+fn open_site_import(app: AppHandle, script: String) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("siteimport") {
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    let handle = app.clone();
+    let url: tauri::Url = "https://cyberpunk2020character.com/".parse().map_err(|e: url::ParseError| e.to_string())?;
+    WebviewWindowBuilder::new(&app, "siteimport", WebviewUrl::External(url))
+        .title("Import a character: cyberpunk2020character.com")
+        .inner_size(1280.0, 860.0)
+        .initialization_script(&script)
+        .on_navigation(move |u| {
+            if u.host_str() == Some("nct-import.local") {
+                let data = u.query_pairs().find(|(k, _)| k == "d").map(|(_, v)| v.into_owned())
+                    .or_else(|| u.fragment().map(percent_decode));
+                if let Some(data) = data {
+                    let _ = handle.emit_to("main", "nct-site-character", data);
+                    if let Some(main) = handle.get_webview_window("main") { let _ = main.set_focus(); }
+                }
+                return false; // never actually go there
+            }
+            true
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn close_now(window: tauri::WebviewWindow) {
     let _ = window.destroy();
@@ -173,7 +222,7 @@ fn close_now(window: tauri::WebviewWindow) {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![clip_read, clip_write, open_external, bookmark_page, close_now, update_install])
+        .invoke_handler(tauri::generate_handler![clip_read, clip_write, open_external, bookmark_page, close_now, update_install, open_site_import])
         .setup(|app| {
             let version = app.package_info().version.to_string();
             let init = INIT_JS.replace("__VERSION__", &version).replace("__REPO__", REPO).replace("__AUTO_UPDATE__", if CAN_AUTO_UPDATE { "true" } else { "false" });

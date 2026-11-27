@@ -740,6 +740,8 @@
     openSheet = N.clone(fresh); renderSheetModal(false);
   }
   function saveSheetSoon() { clearTimeout(sheetSaveTimer); const snap = N.clone(openSheet); sheetSaveTimer = setTimeout(() => request({ type: 'sheet.upsert', sheet: snap }), 400); }
+  let sheetTab = 'stats';
+  const STAT_DESC = { INT: 'Intelligence: problem solving, memory', REF: 'Reflexes: speed, aim, reactions', TECH: 'Technical ability: building, fixing', COOL: 'Cool: calm under pressure', ATTR: 'Attractiveness: looks, charisma', LUCK: 'Luck: fortune when it counts', MA: 'Movement: running speed', BODY: 'Body: strength, toughness', EMP: 'Empathy: relating to people' };
   function renderSheetModal(first) {
     const s = openSheet; if (!s) return;
     const ed = canEditSheet(S.sheets[s.id] || s);
@@ -754,27 +756,46 @@
     // header
     const portrait = el('div', { class: 'portrait', title: ed ? 'Click to change picture' : '', style: s.portrait ? 'background-image:url("' + s.portrait.replace(/"/g, '%22') + '")' : '', onclick: () => { if (ed) pickImage(400, u => { s.portrait = u; saveSheetSoon(); renderSheetModal(false); }); } }, s.portrait ? '' : (ed ? 'Click to add picture' : ''));
     const roleSel = el('select', { disabled: !ed, onchange: change(v => { s.role = v; }) }, ...Object.entries(N.ROLES).map(([k, r]) => el('option', { value: k, text: r.label, selected: k === s.role })), N.ROLES[s.role] ? null : el('option', { value: s.role, text: s.role, selected: true }));
-    const head = el('div', { class: 'shead full' }, portrait, el('div', { class: 'col grow' },
-      el('div', { class: 'row' }, el('label', { text: 'Name' }), inp(s.name, v => { s.name = v; }, { class: 'grow', style: 'font-size:20px;font-weight:700' })),
-      el('div', { class: 'row' }, el('label', { text: 'Handle' }), inp(s.handle, v => { s.handle = v; }, { class: 'grow' }), el('label', { text: 'Role' }), roleSel),
-      el('div', { class: 'row', style: 'flex-wrap:wrap' },
-        el('label', { text: 'Eddies €$' }), inp(s.eddies, v => { s.eddies = v; }, { type: 'number', style: 'width:100px' }),
-        el('label', { text: 'Rep' }), inp(s.rep, v => { s.rep = v; }, { type: 'number' }),
-        el('label', { text: 'Humanity' }), inp(s.humanity, v => { s.humanity = v; }, { type: 'number' }),
-        isGM() ? el('label', { text: 'Owner' }) : null,
-        isGM() ? el('select', { onchange: e => { s.ownerId = e.target.value || null; request({ type: 'sheet.upsert', sheet: N.clone(s) }); } }, el('option', { value: '', text: 'NPC (DM only)' }), ...Object.values(S.players).map(p => el('option', { value: p.id, text: p.name, selected: p.id === s.ownerId }))) : el('span', { class: 'dim', text: 'Player: ' + (s.ownerId ? playerName(s.ownerId) : 'NPC') }),
-        s.source ? el('span', { class: 'dim', style: 'font-size:13px', text: 'Imported from ' + s.source.site + ' ' + ago(s.source.importedAt) }) : null)));
+    const wound = N.woundInfo(s.damage);
+    const wallet = (label, body, color, sub) => el('div', { class: 'wallet', style: '--wc:' + color }, el('div', { class: 'wl', text: label }), body, sub ? el('div', { class: 'ws', text: sub }) : null);
+    const head = el('div', { class: 'dossier full' }, portrait,
+      el('div', { class: 'col grow', style: 'min-width:240px' },
+        el('div', { class: 'dlabel', text: '▮▮ CHARACTER DOSSIER ▮▮' }),
+        inp(s.name, v => { s.name = v; }, { class: 'dname', placeholder: 'Name' }),
+        el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Handle' }), inp(s.handle, v => { s.handle = v; }, { class: 'grow', style: 'min-width:120px' }), el('label', { text: 'Role' }), roleSel),
+        el('div', { class: 'row', style: 'flex-wrap:wrap' },
+          isGM() ? el('label', { text: 'Owner' }) : null,
+          isGM() ? el('select', { onchange: e => { s.ownerId = e.target.value || null; request({ type: 'sheet.upsert', sheet: N.clone(s) }); } }, el('option', { value: '', text: 'NPC (DM only)' }), ...Object.values(S.players).map(p => el('option', { value: p.id, text: p.name, selected: p.id === s.ownerId }))) : el('span', { class: 'dim', text: 'Player: ' + (s.ownerId ? playerName(s.ownerId) : 'NPC') }),
+          s.source ? el('span', { class: 'dim', style: 'font-size:.75rem', text: 'Imported from ' + s.source.site + ' ' + ago(s.source.importedAt) }) : null)),
+      el('div', { class: 'wallets' },
+        wallet('Eddies €$', inp(s.eddies, v => { s.eddies = v; }, { type: 'number', class: 'wv' }), 'var(--green)'),
+        wallet('Humanity', inp(s.humanity, v => { s.humanity = v; }, { type: 'number', class: 'wv' }), '#c77dff', 'EMP ' + N.effStat(s, 'EMP')),
+        wallet('Reputation', inp(s.rep, v => { s.rep = v; }, { type: 'number', class: 'wv' }), 'var(--t)'),
+        wallet('Status', el('div', { class: 'wv', text: wound.label.toUpperCase() }), s.damage >= 13 ? 'var(--red)' : s.damage >= 5 ? '#ff9f1c' : 'var(--p)', 'Damage ' + s.damage + ' / 40')));
 
     // stats
     const stats = el('div', { class: 'statgrid' }, ...N.STATS.map(st => {
-      const base = s.stats[st].base, mod = s.stats[st].mod, eff = N.effStat(s, st), raw = N.statVal(s, st);
-      return el('div', { class: 'stat' },
+      const v = s.stats[st]; v.cyber = v.cyber || 0;
+      const eff = N.effStat(s, st), raw = N.statVal(s, st), natural = Math.max(0, (Number(v.base) || 0) + (Number(v.mod) || 0));
+      const step = (k, dlt, lo, hi) => () => { if (!ed) return; v[k] = Math.max(lo, Math.min(hi, (Number(v[k]) || 0) + dlt)); saveSheetSoon(); renderSheetModal(false); };
+      const adj = (label, k, lo, hi, cls) => el('div', { class: 'adj ' + (cls || '') }, el('span', { class: 'al', text: label }),
+        ed ? el('button', { class: 'small minus', text: '−', onclick: step(k, -1, lo, hi) }) : null,
+        el('input', { type: 'number', value: v[k], min: lo, max: hi, disabled: !ed, onchange: e => { v[k] = Math.max(lo, Math.min(hi, Number(e.target.value) || 0)); saveSheetSoon(); renderSheetModal(false); } }),
+        ed ? el('button', { class: 'small plus', text: '+', onclick: step(k, 1, lo, hi) }) : null);
+      const segs = Math.max(10, Math.min(20, raw));
+      return el('div', { class: 'stat' + (v.cyber ? ' hascyber' : '') },
         el('div', { class: 'top' }, el('div', { class: 'k', title: 'Click to roll 1d10! + ' + st, text: st, onclick: () => rollReq('1d10!' + sign(eff), s.name + ': ' + st + ' check (' + eff + ')') }),
-          el('div', { class: 'v' + (eff < raw ? ' pen' : ''), text: String(eff) })),
-        el('div', { class: 'bar' }, ...Array.from({ length: 10 }, (_, i) => el('i', { class: i < Math.min(10, eff) ? 'f' : '' }))),
-        el('div', { class: 'ins' }, 'BASE', inp(base, v => { s.stats[st].base = v; }, { type: 'number', title: 'Base' }), 'TEMP', inp(mod, v => { s.stats[st].mod = v; }, { type: 'number', title: 'Temporary modifier (drugs, cyberware, etc.)' })));
+          el('div', { class: 'v' + (eff < raw ? ' pen' : '') + (v.cyber > 0 ? ' cy' : ''), text: String(eff) })),
+        el('div', { class: 'sd', text: STAT_DESC[st] }),
+        el('div', { class: 'bar', style: 'grid-template-columns:repeat(' + segs + ',1fr)' }, ...Array.from({ length: segs }, (_, i) => el('i', { class: i < Math.min(natural, raw) ? 'f' : i < raw ? 'f c' : '' }))),
+        adj('BASE', 'base', 0, 10), adj('TEMP', 'mod', -10, 10, 'temp'), adj('CYBER', 'cyber', -10, 10, 'cyb'),
+        el('div', { class: 'stot' }, 'TOTAL ', el('b', { text: String(raw) }), eff < raw ? el('span', { style: 'color:var(--red)', text: ' (' + eff + ' while wounded)' }) : null));
     }));
-    const statBox = el('div', { class: 'box' }, el('h3', { text: 'STATS · CLICK A STAT TO ROLL (BASE / MODIFIER)' }), stats);
+    const statBox = el('div', { class: 'box full' }, el('h3', { text: 'MAIN STATISTICS · CLICK A STAT TO ROLL' }), stats);
+    const tile = (k, v, sub) => el('div', { class: 'tile' }, el('div', { class: 'tk', text: k }), el('div', { class: 'tv', text: v }), el('div', { class: 'ts', text: sub }));
+    const derivedBox = el('div', { class: 'box full' }, el('h3', { text: 'DERIVED STATISTICS' }), el('div', { class: 'tiles' },
+      tile('RUN', d.run + 'm', 'MA × 3 per turn'), tile('LEAP', d.leap + 'm', 'RUN ÷ 4'), tile('LIFT', d.lift + 'kg', 'BODY × 40'), tile('CARRY', d.carry + 'kg', 'BODY × 10'),
+      tile('BTM', String(d.btm), 'body type modifier'), tile('SAVE', String(d.save), 'stun / death save')));
 
     // derived + wounds
     const ra = N.ROLES[s.role];
@@ -859,7 +880,12 @@
       ed ? el('button', { class: 'ghost', text: 'Download sheet', onclick: () => downloadJSON(s, s.name.replace(/[^\w-]+/g, '_') + '.nct-character.json') }) : null,
       ed ? el('button', { class: 'ghost danger', text: 'Delete character', onclick: () => askConfirm('Delete ' + s.name + '?', 'This character sheet is removed for everyone.', 'Delete', () => request({ type: 'sheet.delete', id: s.id })) }) : null,
       el('button', { class: 'primary', text: 'Done', onclick: closeModal }));
-    m.appendChild(el('div', { class: 'sheet' }, head, statBox, deriv, macBox, skillBox, el('div', { class: 'col' }, cyberBox, gearBox), weapBox, notes, foot));
+    const tabs = [['stats', 'Statistics'], ['skills', 'Skills'], ['combat', 'Combat'], ['cyber', 'Cyberware'], ['gear', 'Gear'], ['macros', 'Macros'], ['notes', 'Notes']];
+    const tabBar = el('div', { class: 'sheettabs full' }, ...tabs.map(([k, l]) => el('button', { class: sheetTab === k ? 'on' : '', text: l, onclick: () => { sheetTab = k; renderSheetModal(false); } })));
+    const body = sheetTab === 'skills' ? [skillBox] : sheetTab === 'combat' ? [deriv, el('div', { class: 'box' }, el('h3', { text: 'ROLL TOGGLES' }), modChips(s, ed, () => { saveSheetSoon(); renderSheetModal(false); }), el('div', { class: 'dim', style: 'font-size:.75rem;margin-top:8px', text: 'Switched-on toggles (●) are added to attacks and damage automatically.' })), weapBox]
+      : sheetTab === 'cyber' ? [cyberBox] : sheetTab === 'gear' ? [gearBox] : sheetTab === 'macros' ? [macBox] : sheetTab === 'notes' ? [notes] : [statBox, derivedBox];
+    body.forEach(b => b.classList.add('full'));
+    m.appendChild(el('div', { class: 'sheet' }, head, tabBar, ...body, foot));
     openSheet = s;
     ov.scrollTop = scroll; const sk = $('.skills', ov); if (sk) sk.scrollTop = skScroll;
     if (!ed && first) toast("You can view this character but only its owner or the DM can change it.");
@@ -869,8 +895,18 @@
   function bookmarkletHref() {
     return 'javascript:' + encodeURIComponent('(function(){(' + window.nctGrab.toString() + ')(' + JSON.stringify(APP_URL) + ');})();void 0');
   }
+  function siteImportScript() { return window.nctGrab.toString() + ';\n(' + window.nctSiteHelper.toString() + ')();'; }
   function openImportHelp() {
     const m = modal('Import from cyberpunk2020character.com');
+    if (DESKTOP && window.nctDesktop.openSiteImport) {
+      m.append(el('p', { text: 'The app opens the character site in its own window with a pink bar at the top.' }),
+        el('ol', { class: 'steps' },
+          el('li', null, 'Click the button below.'),
+          el('li', null, 'In that window, open your character the way you normally do. If you use a join or character link, paste it into the bar at the top and press GO.'),
+          el('li', null, 'Once you can see your stats, click ', el('b', { text: 'SEND MY CHARACTER' }), ' in the pink bar. Your character pops up here, ready to add.')),
+        el('button', { class: 'primary', style: 'width:100%;padding:12px', text: 'Open cyberpunk2020character.com', onclick: () => { window.nctDesktop.openSiteImport(siteImportScript()); closeModal(); toast('Opening the character site…'); } }),
+        el('div', { class: 'section-h', style: 'margin-top:18px', text: 'Other ways' }));
+    }
     const bm = DESKTOP ? el('button', { class: 'pink', text: 'Open the button in my web browser', onclick: () => window.nctDesktop.openBookmarkPage(bookmarkletHref()) })
       : el('a', { class: 'bm', href: bookmarkletHref(), onclick: e => { e.preventDefault(); toast("Drag this button to your bookmarks bar (don't click it here)"); } }, '⇩ Send to Night City Table');
     m.append(
@@ -1027,6 +1063,8 @@
     });
   }
   if (ONLINE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+
+  if (DESKTOP && window.nctDesktop.onSiteCharacter) window.nctDesktop.onSiteCharacter(txt => { try { handleIncomingCharacter(JSON.parse(txt)); } catch (e) { toast("That character couldn't be read", true); } });
 
   // ================= START =================
   function start() {

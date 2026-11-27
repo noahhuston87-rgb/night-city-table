@@ -86,8 +86,10 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
   // open sheet, roll a skill, place token
   await pl.bringToFront(); await pl.click('#sheetsPane .item >> text=Open'); await pl.waitForSelector('.sheet');
   await pl.screenshot({path:'test/shot-sheet.png', fullPage:false});
+  await pl.click('.sheettabs button:has-text("Skills")'); await sleep(200);
   await pl.click('.sk:has-text("First Aid") button'); await sleep(300);
-  await pl.click('text=Attack'); await sleep(300);
+  await pl.click('.sheettabs button:has-text("Combat")'); await sleep(200);
+  await pl.click('table.wt button:has-text("Attack")'); await sleep(300);
   await pl.click('.wbox >> nth=9'); await sleep(500);
   await pl.click('#overlay >> text=Done'); await gm.bringToFront(); await sleep(400);
   const lastGM = await gm.$$eval('#chatlog .msg', e=>e.slice(-2).map(x=>x.innerText.replace(/\s+/g,' ')));

@@ -56,7 +56,7 @@
   }
 
   function blankSheet(ownerId) {
-    const stats = {}; for (const s of STATS) stats[s] = { base: 5, mod: 0 };
+    const stats = {}; for (const s of STATS) stats[s] = { base: 5, mod: 0, cyber: 0 };
     const skills = [];
     for (const st in SKILLS_BY_STAT) for (const n of SKILLS_BY_STAT[st]) skills.push({ name: n, stat: st, value: 0 });
     skills.sort((a, b) => a.name.localeCompare(b.name));
@@ -83,7 +83,7 @@
     try { roll('0' + v); } catch (e) { return null; }
     return v.slice(0, 20);
   }
-  function statVal(sheet, s) { const v = sheet.stats && sheet.stats[s]; return v ? (Number(v.base) || 0) + (Number(v.mod) || 0) : 0; }
+  function statVal(sheet, s) { const v = sheet.stats && sheet.stats[s]; return v ? (Number(v.base) || 0) + (Number(v.mod) || 0) + (Number(v.cyber) || 0) : 0; }
   function woundInfo(dmg) {
     dmg = Number(dmg) || 0;
     if (dmg <= 0) return { label: 'Uninjured', level: -1 };
@@ -229,7 +229,7 @@
       specialAbility: clamp(s.specialAbility, 0, 10), humanity: clamp(s.humanity, -100, 200), damage: clamp(s.damage, 0, 41),
       eddies: clamp(s.eddies, -1e9, 1e12), rep: clamp(s.rep, -20, 20), notes: str(s.notes, 20000), source: s.source ? clone(s.source) : null, updatedAt: Date.now()
     });
-    for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20) }; }
+    for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20), cyber: clamp(v.cyber || 0, -10, 10) }; }
     if (Array.isArray(s.skills)) out.skills = s.skills.slice(0, 300).map(k => ({ name: str(k.name, 60), stat: STATS.includes(k.stat) ? k.stat : '', value: clamp(k.value, 0, 20) }));
     for (const [k] of LOCS) out.sp[k] = clamp(s.sp && s.sp[k], 0, 100);
     out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300) }));

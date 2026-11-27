@@ -220,6 +220,42 @@ table.wt input{width:100%;padding:2px 4px}
 .list-ed .r{display:grid;grid-template-columns:1fr 1fr 28px;gap:6px}
 .list-ed .r.cw{grid-template-columns:1fr 50px 1fr 28px}
 
+/* character dossier + tabs (like the character site) */
+.dossier{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap}
+.dossier .portrait{width:120px;height:130px}
+.dlabel{font-family:var(--display);font-size:.7rem;letter-spacing:.3em;color:var(--dim)}
+.dname{font-family:var(--display);font-size:1.5rem !important;font-weight:900;color:var(--p) !important;background:transparent;border:0;border-bottom:1px solid var(--line);padding:2px 0;text-shadow:0 0 calc(8px*var(--gl)) var(--glow);text-transform:uppercase}
+.wallets{display:grid;grid-template-columns:repeat(2,minmax(130px,1fr));gap:8px}
+.wallet{border:2px solid var(--wc);padding:6px 10px;box-shadow:0 0 calc(10px*var(--gl)) color-mix(in srgb,var(--wc) 40%,transparent);background:color-mix(in srgb,var(--wc) 7%,transparent);border-radius:var(--r)}
+.wallet .wl{font-size:.68rem;letter-spacing:.12em;color:var(--wc);text-transform:uppercase}
+.wallet .wv,.wallet input.wv{font-family:var(--display);font-size:1.35rem;font-weight:900;color:var(--wc);background:transparent;border:0;width:100%;padding:0;text-shadow:0 0 calc(6px*var(--gl)) var(--wc)}
+.wallet .ws{font-size:.65rem;color:var(--dim);text-transform:uppercase}
+.sheettabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:2px solid var(--p);padding-bottom:8px}
+.sheettabs button{flex:1;min-width:110px;padding:9px 6px;font-family:var(--display);font-weight:700;letter-spacing:.08em;background:transparent;border:1px solid var(--line)}
+.sheettabs button::before{content:'◆ ';color:var(--s)}
+.sheettabs button.on{border:2px solid var(--p);background:color-mix(in srgb,var(--p) 16%,transparent);box-shadow:0 0 calc(12px*var(--gl)) var(--glow);color:var(--p)}
+.sheettabs button.on::before{color:var(--p)}
+.sheet .statgrid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.stat .sd{font-size:.68rem;color:var(--dim);margin-top:2px}
+.stat.hascyber{border-color:#00b4ff;box-shadow:0 0 calc(10px*var(--gl)) rgba(0,180,255,.35)}
+.stat .v.cy{color:#33c3ff;text-shadow:0 0 calc(8px*var(--gl)) rgba(0,180,255,.6)}
+.stat .bar i.f.c{background:#00b4ff;border-color:#00b4ff;box-shadow:0 0 calc(4px*var(--gl)) rgba(0,180,255,.6)}
+.stat .adj{display:flex;align-items:center;gap:4px;margin-top:4px;font-size:.7rem}
+.stat .adj .al{width:44px;color:var(--dim)}
+.stat .adj.cyb .al{color:#33c3ff}
+.stat .adj input{width:44px;padding:1px 2px}
+.stat .adj button{padding:0 7px;min-width:24px}
+.stat .adj button.minus{color:var(--red);border-color:color-mix(in srgb,var(--red) 50%,transparent)}
+.stat .adj button.plus{color:var(--green);border-color:color-mix(in srgb,var(--green) 50%,transparent)}
+.stat .stot{text-align:right;font-size:.75rem;color:var(--dim);margin-top:5px;border-top:1px solid var(--line);padding-top:4px}
+.stat .stot b{color:var(--p);font-size:.95rem}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.tile{border:1px solid var(--line);padding:8px 10px;background:color-mix(in srgb,var(--p) 4%,transparent);border-radius:var(--r)}
+.tile .tk{font-size:.75rem;color:var(--p);letter-spacing:.08em;font-weight:700}
+.tile .tv{font-family:var(--display);font-size:1.5rem;font-weight:900;color:var(--p);text-shadow:0 0 calc(6px*var(--gl)) var(--glow);text-align:right}
+.tile .ts{font-size:.65rem;color:var(--dim);text-transform:uppercase}
+.sheet .skills{max-height:62vh}
+
 /* settings */
 .stabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .stabs button.on{border:2px solid var(--p);background:color-mix(in srgb,var(--p) 18%,transparent)}
@@ -477,7 +513,13 @@ function nctGrab(APP) {
   }
 
   ui('Reading your character…', true);
-  var ch = fromReact();
+  function fromCapture() {
+    var cap = window.__nctCap; if (!cap || !cap.chars) return null;
+    if (playerId && cap.chars[playerId] && score(cap.chars[playerId])) return cap.chars[playerId];
+    var best = null, bs = 0; for (var k in cap.chars) { var sc = score(cap.chars[k]); if (sc > bs) { bs = sc; best = cap.chars[k]; } }
+    return best;
+  }
+  var ch = fromCapture() || fromReact();
   (ch ? Promise.resolve(ch) : fromServer()).then(function (c) {
     if (!c) { ui('Couldn\'t find a character on this page. Open your character sheet on this site (so you can see your stats), then click the bookmark again.', true); return; }
     var data = JSON.parse(JSON.stringify(c, function (k, v) { return (typeof v === 'string' && v.length > 700000) ? undefined : v; }));
@@ -487,6 +529,10 @@ function nctGrab(APP) {
     var copied = false;
     try { navigator.clipboard.writeText(text).then(function () { copied = true; }, function () { }); } catch (e) { }
     var name = esc(data.name || 'your character');
+    if (APP === '@desktop') { // the Night City Table app's own import window picks this up
+      location.href = 'https://nct-import.local/?d=' + encodeURIComponent(JSON.stringify(payload));
+      ui('<b>' + name + '</b> sent to Night City Table ✓ You can close this window, or send another character.', true); return;
+    }
     if (!APP) { ui('<b>' + name + '</b> copied! Switch to the Night City Table app and it pops up by itself. (If it doesn\'t: Sheets → Import → <b>Paste</b>.)', true); return; }
     var w = null; try { w = window.open(APP + '#import', 'nct_import'); } catch (e) { }
     if (!w) {
@@ -498,6 +544,44 @@ function nctGrab(APP) {
     window.addEventListener('message', function (e) { if (e.data && e.data.type === 'nct-ack') { clearInterval(iv); ui('<b>' + name + '</b> sent to Night City Table ✓'); } });
     ui('Sending <b>' + name + '</b> to Night City Table…');
   });
+}
+
+/* Runs in the desktop app's import window before the site loads: records character data the site receives
+   from its own server, and adds a bar with a button to send the character to Night City Table. */
+function nctSiteHelper() {
+  if (window.__nctCap) return;
+  var cap = window.__nctCap = { chars: {} };
+  function add(o) { if (o && o.id != null && (o.attributes || o.skills)) cap.chars[o.id] = Object.assign(cap.chars[o.id] || {}, o); }
+  function take(ev, d) {
+    try {
+      if (!d) return;
+      if (ev === 'character:data') { var id = d.playerId != null ? d.playerId : d.id; if (id != null) cap.chars[id] = Object.assign(cap.chars[id] || {}, d, { id: id }); }
+      if (ev === 'player:field_update' && d.playerId != null && d.fields) { cap.chars[d.playerId] = Object.assign(cap.chars[d.playerId] || { id: d.playerId }, d.fields); }
+      var list = d.players || (d.gameState && d.gameState.players) || (d.newState && d.newState.players) || (Array.isArray(d) ? d : null);
+      if (list) for (var i = 0; i < list.length; i++) add(list[i]);
+    } catch (e) { }
+  }
+  function parse(txt) { if (typeof txt !== 'string') return; var ps = txt.split('\x1e'); for (var i = 0; i < ps.length; i++) { var p = ps[i]; if (p.indexOf('42') === 0) { try { var a = JSON.parse(p.slice(2).replace(/^\d+/, '')); take(a[0], a[1]); } catch (e) { } } } }
+  var WS = window.WebSocket;
+  var Wrapped = function (u, pr) { var ws = pr !== undefined ? new WS(u, pr) : new WS(u); ws.addEventListener('message', function (e) { parse(e.data); }); return ws; };
+  Wrapped.prototype = WS.prototype; Wrapped.CONNECTING = 0; Wrapped.OPEN = 1; Wrapped.CLOSING = 2; Wrapped.CLOSED = 3; window.WebSocket = Wrapped;
+  var open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (m, u) { var x = this; if (String(u).indexOf('/socket.io/') >= 0) x.addEventListener('load', function () { try { parse(x.responseText); } catch (e) { } }); return open.apply(this, arguments); };
+  var f = window.fetch;
+  window.fetch = function (input) { var u = String(input && input.url || input); return f.apply(this, arguments).then(function (r) { if (u.indexOf('/socket.io/') >= 0) { try { r.clone().text().then(parse); } catch (e) { } } return r; }); };
+  function bar() {
+    if (document.getElementById('nct-bar')) return;
+    var b = document.createElement('div'); b.id = 'nct-bar';
+    b.setAttribute('style', 'position:fixed;left:0;right:0;top:0;z-index:2147483646;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#000;border-bottom:2px solid #ff2a6d;box-shadow:0 0 18px #ff2a6d;font:14px system-ui,sans-serif;color:#e6f4ff');
+    b.innerHTML = '<b style="color:#ff2a6d">NIGHT CITY TABLE IMPORT</b><span style="opacity:.8">Open your character on this site (use your normal link), then:</span>' +
+      '<button id="nct-send" style="background:#ff2a6d;color:#fff;border:0;padding:7px 14px;font-weight:700;cursor:pointer">SEND MY CHARACTER</button>' +
+      '<span style="flex:1"></span><input id="nct-url" placeholder="Paste a link from the site (join / character link)" style="width:300px;background:#111;color:#fff;border:1px solid #555;padding:5px"><button id="nct-go" style="background:#222;color:#fff;border:1px solid #555;padding:6px 10px;cursor:pointer">GO</button>';
+    document.body.appendChild(b); document.body.style.marginTop = (b.offsetHeight + 4) + 'px';
+    document.getElementById('nct-send').onclick = function () { nctGrab('@desktop'); };
+    document.getElementById('nct-go').onclick = function () { var u = document.getElementById('nct-url').value.trim(); if (/^https:\/\/(www\.)?cyberpunk2020character\.com\//.test(u)) location.href = u; else alert('Paste a link that starts with https://cyberpunk2020character.com/'); };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bar); else bar();
+  setInterval(bar, 1500);
 }
 
 </script>
@@ -560,7 +644,7 @@ function nctGrab(APP) {
   }
 
   function blankSheet(ownerId) {
-    const stats = {}; for (const s of STATS) stats[s] = { base: 5, mod: 0 };
+    const stats = {}; for (const s of STATS) stats[s] = { base: 5, mod: 0, cyber: 0 };
     const skills = [];
     for (const st in SKILLS_BY_STAT) for (const n of SKILLS_BY_STAT[st]) skills.push({ name: n, stat: st, value: 0 });
     skills.sort((a, b) => a.name.localeCompare(b.name));
@@ -587,7 +671,7 @@ function nctGrab(APP) {
     try { roll('0' + v); } catch (e) { return null; }
     return v.slice(0, 20);
   }
-  function statVal(sheet, s) { const v = sheet.stats && sheet.stats[s]; return v ? (Number(v.base) || 0) + (Number(v.mod) || 0) : 0; }
+  function statVal(sheet, s) { const v = sheet.stats && sheet.stats[s]; return v ? (Number(v.base) || 0) + (Number(v.mod) || 0) + (Number(v.cyber) || 0) : 0; }
   function woundInfo(dmg) {
     dmg = Number(dmg) || 0;
     if (dmg <= 0) return { label: 'Uninjured', level: -1 };
@@ -733,7 +817,7 @@ function nctGrab(APP) {
       specialAbility: clamp(s.specialAbility, 0, 10), humanity: clamp(s.humanity, -100, 200), damage: clamp(s.damage, 0, 41),
       eddies: clamp(s.eddies, -1e9, 1e12), rep: clamp(s.rep, -20, 20), notes: str(s.notes, 20000), source: s.source ? clone(s.source) : null, updatedAt: Date.now()
     });
-    for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20) }; }
+    for (const st of STATS) { const v = (s.stats && s.stats[st]) || {}; out.stats[st] = { base: clamp(v.base, 0, 30), mod: clamp(v.mod, -20, 20), cyber: clamp(v.cyber || 0, -10, 10) }; }
     if (Array.isArray(s.skills)) out.skills = s.skills.slice(0, 300).map(k => ({ name: str(k.name, 60), stat: STATS.includes(k.stat) ? k.stat : '', value: clamp(k.value, 0, 20) }));
     for (const [k] of LOCS) out.sp[k] = clamp(s.sp && s.sp[k], 0, 100);
     out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300) }));
@@ -1818,6 +1902,8 @@ window.peerReady = new Promise(function (resolve) {
     openSheet = N.clone(fresh); renderSheetModal(false);
   }
   function saveSheetSoon() { clearTimeout(sheetSaveTimer); const snap = N.clone(openSheet); sheetSaveTimer = setTimeout(() => request({ type: 'sheet.upsert', sheet: snap }), 400); }
+  let sheetTab = 'stats';
+  const STAT_DESC = { INT: 'Intelligence: problem solving, memory', REF: 'Reflexes: speed, aim, reactions', TECH: 'Technical ability: building, fixing', COOL: 'Cool: calm under pressure', ATTR: 'Attractiveness: looks, charisma', LUCK: 'Luck: fortune when it counts', MA: 'Movement: running speed', BODY: 'Body: strength, toughness', EMP: 'Empathy: relating to people' };
   function renderSheetModal(first) {
     const s = openSheet; if (!s) return;
     const ed = canEditSheet(S.sheets[s.id] || s);
@@ -1832,27 +1918,46 @@ window.peerReady = new Promise(function (resolve) {
     // header
     const portrait = el('div', { class: 'portrait', title: ed ? 'Click to change picture' : '', style: s.portrait ? 'background-image:url("' + s.portrait.replace(/"/g, '%22') + '")' : '', onclick: () => { if (ed) pickImage(400, u => { s.portrait = u; saveSheetSoon(); renderSheetModal(false); }); } }, s.portrait ? '' : (ed ? 'Click to add picture' : ''));
     const roleSel = el('select', { disabled: !ed, onchange: change(v => { s.role = v; }) }, ...Object.entries(N.ROLES).map(([k, r]) => el('option', { value: k, text: r.label, selected: k === s.role })), N.ROLES[s.role] ? null : el('option', { value: s.role, text: s.role, selected: true }));
-    const head = el('div', { class: 'shead full' }, portrait, el('div', { class: 'col grow' },
-      el('div', { class: 'row' }, el('label', { text: 'Name' }), inp(s.name, v => { s.name = v; }, { class: 'grow', style: 'font-size:20px;font-weight:700' })),
-      el('div', { class: 'row' }, el('label', { text: 'Handle' }), inp(s.handle, v => { s.handle = v; }, { class: 'grow' }), el('label', { text: 'Role' }), roleSel),
-      el('div', { class: 'row', style: 'flex-wrap:wrap' },
-        el('label', { text: 'Eddies €$' }), inp(s.eddies, v => { s.eddies = v; }, { type: 'number', style: 'width:100px' }),
-        el('label', { text: 'Rep' }), inp(s.rep, v => { s.rep = v; }, { type: 'number' }),
-        el('label', { text: 'Humanity' }), inp(s.humanity, v => { s.humanity = v; }, { type: 'number' }),
-        isGM() ? el('label', { text: 'Owner' }) : null,
-        isGM() ? el('select', { onchange: e => { s.ownerId = e.target.value || null; request({ type: 'sheet.upsert', sheet: N.clone(s) }); } }, el('option', { value: '', text: 'NPC (DM only)' }), ...Object.values(S.players).map(p => el('option', { value: p.id, text: p.name, selected: p.id === s.ownerId }))) : el('span', { class: 'dim', text: 'Player: ' + (s.ownerId ? playerName(s.ownerId) : 'NPC') }),
-        s.source ? el('span', { class: 'dim', style: 'font-size:13px', text: 'Imported from ' + s.source.site + ' ' + ago(s.source.importedAt) }) : null)));
+    const wound = N.woundInfo(s.damage);
+    const wallet = (label, body, color, sub) => el('div', { class: 'wallet', style: '--wc:' + color }, el('div', { class: 'wl', text: label }), body, sub ? el('div', { class: 'ws', text: sub }) : null);
+    const head = el('div', { class: 'dossier full' }, portrait,
+      el('div', { class: 'col grow', style: 'min-width:240px' },
+        el('div', { class: 'dlabel', text: '▮▮ CHARACTER DOSSIER ▮▮' }),
+        inp(s.name, v => { s.name = v; }, { class: 'dname', placeholder: 'Name' }),
+        el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Handle' }), inp(s.handle, v => { s.handle = v; }, { class: 'grow', style: 'min-width:120px' }), el('label', { text: 'Role' }), roleSel),
+        el('div', { class: 'row', style: 'flex-wrap:wrap' },
+          isGM() ? el('label', { text: 'Owner' }) : null,
+          isGM() ? el('select', { onchange: e => { s.ownerId = e.target.value || null; request({ type: 'sheet.upsert', sheet: N.clone(s) }); } }, el('option', { value: '', text: 'NPC (DM only)' }), ...Object.values(S.players).map(p => el('option', { value: p.id, text: p.name, selected: p.id === s.ownerId }))) : el('span', { class: 'dim', text: 'Player: ' + (s.ownerId ? playerName(s.ownerId) : 'NPC') }),
+          s.source ? el('span', { class: 'dim', style: 'font-size:.75rem', text: 'Imported from ' + s.source.site + ' ' + ago(s.source.importedAt) }) : null)),
+      el('div', { class: 'wallets' },
+        wallet('Eddies €$', inp(s.eddies, v => { s.eddies = v; }, { type: 'number', class: 'wv' }), 'var(--green)'),
+        wallet('Humanity', inp(s.humanity, v => { s.humanity = v; }, { type: 'number', class: 'wv' }), '#c77dff', 'EMP ' + N.effStat(s, 'EMP')),
+        wallet('Reputation', inp(s.rep, v => { s.rep = v; }, { type: 'number', class: 'wv' }), 'var(--t)'),
+        wallet('Status', el('div', { class: 'wv', text: wound.label.toUpperCase() }), s.damage >= 13 ? 'var(--red)' : s.damage >= 5 ? '#ff9f1c' : 'var(--p)', 'Damage ' + s.damage + ' / 40')));
 
     // stats
     const stats = el('div', { class: 'statgrid' }, ...N.STATS.map(st => {
-      const base = s.stats[st].base, mod = s.stats[st].mod, eff = N.effStat(s, st), raw = N.statVal(s, st);
-      return el('div', { class: 'stat' },
+      const v = s.stats[st]; v.cyber = v.cyber || 0;
+      const eff = N.effStat(s, st), raw = N.statVal(s, st), natural = Math.max(0, (Number(v.base) || 0) + (Number(v.mod) || 0));
+      const step = (k, dlt, lo, hi) => () => { if (!ed) return; v[k] = Math.max(lo, Math.min(hi, (Number(v[k]) || 0) + dlt)); saveSheetSoon(); renderSheetModal(false); };
+      const adj = (label, k, lo, hi, cls) => el('div', { class: 'adj ' + (cls || '') }, el('span', { class: 'al', text: label }),
+        ed ? el('button', { class: 'small minus', text: '−', onclick: step(k, -1, lo, hi) }) : null,
+        el('input', { type: 'number', value: v[k], min: lo, max: hi, disabled: !ed, onchange: e => { v[k] = Math.max(lo, Math.min(hi, Number(e.target.value) || 0)); saveSheetSoon(); renderSheetModal(false); } }),
+        ed ? el('button', { class: 'small plus', text: '+', onclick: step(k, 1, lo, hi) }) : null);
+      const segs = Math.max(10, Math.min(20, raw));
+      return el('div', { class: 'stat' + (v.cyber ? ' hascyber' : '') },
         el('div', { class: 'top' }, el('div', { class: 'k', title: 'Click to roll 1d10! + ' + st, text: st, onclick: () => rollReq('1d10!' + sign(eff), s.name + ': ' + st + ' check (' + eff + ')') }),
-          el('div', { class: 'v' + (eff < raw ? ' pen' : ''), text: String(eff) })),
-        el('div', { class: 'bar' }, ...Array.from({ length: 10 }, (_, i) => el('i', { class: i < Math.min(10, eff) ? 'f' : '' }))),
-        el('div', { class: 'ins' }, 'BASE', inp(base, v => { s.stats[st].base = v; }, { type: 'number', title: 'Base' }), 'TEMP', inp(mod, v => { s.stats[st].mod = v; }, { type: 'number', title: 'Temporary modifier (drugs, cyberware, etc.)' })));
+          el('div', { class: 'v' + (eff < raw ? ' pen' : '') + (v.cyber > 0 ? ' cy' : ''), text: String(eff) })),
+        el('div', { class: 'sd', text: STAT_DESC[st] }),
+        el('div', { class: 'bar', style: 'grid-template-columns:repeat(' + segs + ',1fr)' }, ...Array.from({ length: segs }, (_, i) => el('i', { class: i < Math.min(natural, raw) ? 'f' : i < raw ? 'f c' : '' }))),
+        adj('BASE', 'base', 0, 10), adj('TEMP', 'mod', -10, 10, 'temp'), adj('CYBER', 'cyber', -10, 10, 'cyb'),
+        el('div', { class: 'stot' }, 'TOTAL ', el('b', { text: String(raw) }), eff < raw ? el('span', { style: 'color:var(--red)', text: ' (' + eff + ' while wounded)' }) : null));
     }));
-    const statBox = el('div', { class: 'box' }, el('h3', { text: 'STATS · CLICK A STAT TO ROLL (BASE / MODIFIER)' }), stats);
+    const statBox = el('div', { class: 'box full' }, el('h3', { text: 'MAIN STATISTICS · CLICK A STAT TO ROLL' }), stats);
+    const tile = (k, v, sub) => el('div', { class: 'tile' }, el('div', { class: 'tk', text: k }), el('div', { class: 'tv', text: v }), el('div', { class: 'ts', text: sub }));
+    const derivedBox = el('div', { class: 'box full' }, el('h3', { text: 'DERIVED STATISTICS' }), el('div', { class: 'tiles' },
+      tile('RUN', d.run + 'm', 'MA × 3 per turn'), tile('LEAP', d.leap + 'm', 'RUN ÷ 4'), tile('LIFT', d.lift + 'kg', 'BODY × 40'), tile('CARRY', d.carry + 'kg', 'BODY × 10'),
+      tile('BTM', String(d.btm), 'body type modifier'), tile('SAVE', String(d.save), 'stun / death save')));
 
     // derived + wounds
     const ra = N.ROLES[s.role];
@@ -1937,7 +2042,12 @@ window.peerReady = new Promise(function (resolve) {
       ed ? el('button', { class: 'ghost', text: 'Download sheet', onclick: () => downloadJSON(s, s.name.replace(/[^\w-]+/g, '_') + '.nct-character.json') }) : null,
       ed ? el('button', { class: 'ghost danger', text: 'Delete character', onclick: () => askConfirm('Delete ' + s.name + '?', 'This character sheet is removed for everyone.', 'Delete', () => request({ type: 'sheet.delete', id: s.id })) }) : null,
       el('button', { class: 'primary', text: 'Done', onclick: closeModal }));
-    m.appendChild(el('div', { class: 'sheet' }, head, statBox, deriv, macBox, skillBox, el('div', { class: 'col' }, cyberBox, gearBox), weapBox, notes, foot));
+    const tabs = [['stats', 'Statistics'], ['skills', 'Skills'], ['combat', 'Combat'], ['cyber', 'Cyberware'], ['gear', 'Gear'], ['macros', 'Macros'], ['notes', 'Notes']];
+    const tabBar = el('div', { class: 'sheettabs full' }, ...tabs.map(([k, l]) => el('button', { class: sheetTab === k ? 'on' : '', text: l, onclick: () => { sheetTab = k; renderSheetModal(false); } })));
+    const body = sheetTab === 'skills' ? [skillBox] : sheetTab === 'combat' ? [deriv, el('div', { class: 'box' }, el('h3', { text: 'ROLL TOGGLES' }), modChips(s, ed, () => { saveSheetSoon(); renderSheetModal(false); }), el('div', { class: 'dim', style: 'font-size:.75rem;margin-top:8px', text: 'Switched-on toggles (●) are added to attacks and damage automatically.' })), weapBox]
+      : sheetTab === 'cyber' ? [cyberBox] : sheetTab === 'gear' ? [gearBox] : sheetTab === 'macros' ? [macBox] : sheetTab === 'notes' ? [notes] : [statBox, derivedBox];
+    body.forEach(b => b.classList.add('full'));
+    m.appendChild(el('div', { class: 'sheet' }, head, tabBar, ...body, foot));
     openSheet = s;
     ov.scrollTop = scroll; const sk = $('.skills', ov); if (sk) sk.scrollTop = skScroll;
     if (!ed && first) toast("You can view this character but only its owner or the DM can change it.");
@@ -1947,8 +2057,18 @@ window.peerReady = new Promise(function (resolve) {
   function bookmarkletHref() {
     return 'javascript:' + encodeURIComponent('(function(){(' + window.nctGrab.toString() + ')(' + JSON.stringify(APP_URL) + ');})();void 0');
   }
+  function siteImportScript() { return window.nctGrab.toString() + ';\n(' + window.nctSiteHelper.toString() + ')();'; }
   function openImportHelp() {
     const m = modal('Import from cyberpunk2020character.com');
+    if (DESKTOP && window.nctDesktop.openSiteImport) {
+      m.append(el('p', { text: 'The app opens the character site in its own window with a pink bar at the top.' }),
+        el('ol', { class: 'steps' },
+          el('li', null, 'Click the button below.'),
+          el('li', null, 'In that window, open your character the way you normally do. If you use a join or character link, paste it into the bar at the top and press GO.'),
+          el('li', null, 'Once you can see your stats, click ', el('b', { text: 'SEND MY CHARACTER' }), ' in the pink bar. Your character pops up here, ready to add.')),
+        el('button', { class: 'primary', style: 'width:100%;padding:12px', text: 'Open cyberpunk2020character.com', onclick: () => { window.nctDesktop.openSiteImport(siteImportScript()); closeModal(); toast('Opening the character site…'); } }),
+        el('div', { class: 'section-h', style: 'margin-top:18px', text: 'Other ways' }));
+    }
     const bm = DESKTOP ? el('button', { class: 'pink', text: 'Open the button in my web browser', onclick: () => window.nctDesktop.openBookmarkPage(bookmarkletHref()) })
       : el('a', { class: 'bm', href: bookmarkletHref(), onclick: e => { e.preventDefault(); toast("Drag this button to your bookmarks bar (don't click it here)"); } }, '⇩ Send to Night City Table');
     m.append(
@@ -2703,6 +2823,8 @@ window.peerReady = new Promise(function (resolve) {
     });
   }
   if (ONLINE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+
+  if (DESKTOP && window.nctDesktop.onSiteCharacter) window.nctDesktop.onSiteCharacter(txt => { try { handleIncomingCharacter(JSON.parse(txt)); } catch (e) { toast("That character couldn't be read", true); } });
 
   // ================= START =================
   function start() {

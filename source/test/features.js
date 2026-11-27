@@ -62,10 +62,12 @@ await pl.keyboard.press('Escape');
 // sheet look
 await pl.click('#tabs button[data-tab=sheets]'); await pl.click('text=+ New character'); await sleep(900); await pl.screenshot({path:'test/f-sheet.png'});
 // --- macros, toggles, damage ---
+await pl.click('.sheettabs button:has-text("Macros")'); await sleep(200);
 await pl.click('.sheet >> text=+ New macro'); await pl.fill('#overlay input >> nth=0','Shoot'); await pl.fill('#overlay input >> nth=1','1d10! + @REF + @Handgun + 1');
 console.log('macro preview:', await pl.textContent('#overlay .mono.dim')); await pl.click('#overlay >> text=Save'); await sleep(900);
 await pl.click('.sheet button:has-text("Aiming")'); await pl.click('.sheet button:has-text("Smartgun link")'); await sleep(700);
 await pl.click('.sheet button:has-text("▶ Shoot")'); await sleep(500);
+await pl.click('.sheettabs button:has-text("Combat")'); await sleep(200);
 await pl.click('.sheet >> text=+ Add weapon'); await sleep(700);
 await pl.click('table.wt button:has-text("Dmg")'); await sleep(500);
 await pl.keyboard.press('Escape'); await pl.click('#tabs button[data-tab=chat]'); await sleep(300);
