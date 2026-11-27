@@ -63,12 +63,7 @@ ipcMain.on('nct:bookmark-page', (e, href) => {
     '<ol><li>Show your bookmarks bar: press <b>Ctrl+Shift+B</b> (or <b>⌘+Shift+B</b> on Mac).</li>' +
     '<li><b>Drag this pink button</b> up onto the bookmarks bar:<p><a href="' + esc(href) + '" style="display:inline-block;background:#ff2a6d;color:#fff;padding:10px 16px;border-radius:6px;font-weight:700;text-decoration:none">⇩ Send to Night City Table</a></p></li>' +
     '<li>Open your character on <b>cyberpunk2020character.com</b> and click the bookmark.</li>' +
-    '<li>Switch back to the Night City Table app. Your character pops up there.</li></ol>' +
-    '<h2 style="color:#05d9e8;font-size:20px">Dragging doesn\'t work?</h2>' +
-    '<p>Copy the code, then add a bookmark by hand: right-click the bookmarks bar, choose <b>Add page</b> (Chrome or Edge) or <b>Add Bookmark</b> (Firefox). Name it <b>Send to Night City Table</b>, paste the code into the <b>URL</b> box, and save.</p>' +
-    '<p><button id="cp" style="background:#05d9e8;color:#000;border:0;padding:10px 16px;border-radius:6px;font-weight:700;font-size:16px;cursor:pointer">Copy bookmark code</button></p>' +
-    '<textarea id="code" readonly style="width:100%;height:70px;background:#000;color:#7f8;border:1px solid #334">' + esc(href) + '</textarea>' +
-    '<script>document.getElementById("cp").onclick=function(){var t=document.getElementById("code");t.select();var ok=false;try{ok=document.execCommand("copy")}catch(e){}if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(function(){},function(){});this.textContent=ok?"Copied!":"Copied (or press Ctrl+C)";};</script>' +
+    '<li>A small window says <b>Sent</b> and your character pops up in the Night City Table app (keep the app open).</li></ol>' +
     '<p style="color:#8aa0c2">You can close this page now. You only need to do this once.</p></body>';
   const f = path.join(os.tmpdir(), 'night-city-table-import-button.html');
   fs.writeFileSync(f, html);
@@ -94,7 +89,25 @@ ipcMain.on('nct:site-import', (e, script) => {
 });
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+// The "Send to Night City Table" bookmark opens http://127.0.0.1:47820/import?d=<character>.
+// This tiny server (only reachable from this computer) hands the character to the game.
+function startImportServer() {
+  const http = require('http');
+  const done = '<!DOCTYPE html><meta charset="utf-8"><title>Sent to Night City Table</title><body style="background:#070a12;color:#39ff6a;font:18px/1.5 system-ui,sans-serif;text-align:center;padding:40px 20px"><h2>&#10003; Sent to Night City Table</h2><p style="color:#8aa0c2">Switch to the app: your character is waiting there. This window closes by itself.</p><script>setTimeout(function(){window.close()},1800)</script></body>';
+  const srv = http.createServer({ maxHeaderSize: 16 * 1024 * 1024 }, (req, res) => {
+    const hdr = { 'Content-Type': 'text/html; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Private-Network': 'true', 'Cache-Control': 'no-store' };
+    let u; try { u = new URL(req.url, 'http://127.0.0.1'); } catch (e) { res.writeHead(400, hdr); return res.end(); }
+    if (u.pathname === '/ping') { res.writeHead(200, hdr); return res.end('ok'); }
+    const d = u.pathname === '/import' && u.searchParams.get('d');
+    if (d && win) { win.webContents.send('nct:site-character', d); if (win.isMinimized()) win.restore(); win.show(); win.focus(); res.writeHead(200, hdr); return res.end(done); }
+    res.writeHead(404, hdr); res.end('Night City Table');
+  });
+  srv.on('error', () => { });
+  srv.listen(47820, '127.0.0.1');
+}
+
 app.whenReady().then(() => {
+  startImportServer();
   protocol.handle('app', req => {
     const u = new URL(req.url);
     let p = decodeURIComponent(u.pathname); if (p === '/' || p === '') p = '/index.html';

@@ -93,7 +93,7 @@ function nctGrab(APP) {
   var ch = fromCapture() || fromReact();
   (ch ? Promise.resolve(ch) : fromServer()).then(function (c) {
     if (!c) { ui('Couldn\'t find a character on this page. Open your character sheet on this site (so you can see your stats), then click the bookmark again.', true); return; }
-    var data = JSON.parse(JSON.stringify(c, function (k, v) { return (typeof v === 'string' && v.length > 700000) ? undefined : v; }));
+    var data = JSON.parse(JSON.stringify(c, function (k, v) { return (typeof v === 'string' && v.length > 1048576) ? undefined : v; }));
     if (!data.id && playerId) data.id = playerId;
     var payload = { type: 'nct-character', v: 1, playerId: playerId || data.id || null, data: data, from: location.href };
     var text = 'NCT1:' + JSON.stringify(payload);
@@ -103,6 +103,15 @@ function nctGrab(APP) {
     if (APP === '@desktop') { // the Night City Table app's own import window picks this up
       location.href = 'https://nct-import.local/?d=' + encodeURIComponent(JSON.stringify(payload));
       ui('<b>' + name + '</b> sent to Night City Table ✓ You can close this window, or send another character.', true); return;
+    }
+    if (/^http:\/\/127\.0\.0\.1:/.test(APP)) { // the Night City Table app on this computer receives it directly
+      var target = APP + 'import?d=' + encodeURIComponent(JSON.stringify(payload));
+      if (target.length > 2000000 && data.portrait) { delete data.portrait; payload.data = data; target = APP + 'import?d=' + encodeURIComponent(JSON.stringify(payload)); } // browsers cap links near 2 MB
+      var send = function () { var ww = null; try { ww = window.open(target, 'nct_import', 'width=480,height=320'); } catch (e) { } return ww; };
+      if (send()) { ui('<b>' + name + '</b> sent to Night City Table ✓ Switch to the app: it pops up there.<br><span style="color:#8aa0c2">Nothing there? Make sure the Night City Table app is open, then click the bookmark again.</span>', true); return; }
+      var dd = ui('Found <b>' + name + '</b>.<br><button id="nct-go" style="margin-top:8px;width:100%;background:#ff2a6d;color:#fff;border:0;padding:10px;border-radius:4px;font-weight:700;cursor:pointer">SEND TO NIGHT CITY TABLE</button><div style="color:#8aa0c2;margin-top:6px">The Night City Table app must be open.</div>', true);
+      dd.querySelector('#nct-go').onclick = function () { send(); ui('<b>' + name + '</b> sent to Night City Table ✓ Switch to the app: it pops up there.', true); };
+      return;
     }
     if (!APP) { ui('<b>' + name + '</b> copied! Switch to the Night City Table app and it pops up by itself. (If it doesn\'t: Sheets → Import → <b>Paste</b>.)', true); return; }
     var w = null; try { w = window.open(APP + '#import', 'nct_import'); } catch (e) { }

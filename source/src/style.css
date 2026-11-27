@@ -319,6 +319,7 @@ table.wt input{width:100%;padding:2px 4px}
   #backupBtn{display:none!important}
   #inviteBtn{font-size:0;padding:6px 10px}
   #inviteBtn::after{content:'INVITE';font-size:.72rem}
+  #webBtn{font-size:.68rem;padding:6px 8px;white-space:nowrap}
   #topbar button{min-width:40px;min-height:36px}
   #tools{order:1;flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:6px;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
   #tools > div{width:8px;height:auto!important}

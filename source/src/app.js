@@ -301,6 +301,7 @@
     if (!S) { $('#campTitle').textContent = 'Connecting to game ' + (joinCode || ''); draw(); return; }
     $('#campTitle').textContent = S.name;
     $('#inviteBtn').classList.toggle('hidden', !isGM());
+    const wb = $('#webBtn'); wb.classList.toggle('hidden', role !== 'host'); wb.textContent = '🌐 Web: ' + (S.allowWeb ? 'ON' : 'off'); wb.classList.toggle('primary', !!S.allowWeb);
     $('#backupBtn').classList.toggle('hidden', !isGM());
     $$('.gmonly').forEach(b => b.classList.toggle('hidden', !isGM()));
     renderPeople();
@@ -335,6 +336,13 @@
   }
   $('#leaveBtn').onclick = () => { if (role === 'host' && net.conns.size) askConfirm('Leave the game?', 'Your players will be disconnected until you open the game again. Your game is saved.', 'Leave', leave); else leave(); };
   $('#backupBtn').onclick = () => { saveNow(); downloadJSON(S, 'night-city-table-' + S.name.replace(/[^\w-]+/g, '_') + '.json'); };
+  function setAllowWeb(on) {
+    hostCommit(N.handleRequest(S, { type: 'web.allow', on }, { id: me.id, isGM: true }));
+    if (!on) for (const c of net.conns.values()) if (c.web) { try { c.send({ t: 'err', fatal: true, msg: 'The DM switched off web browser joining. Use the Night City Table app to rejoin.' }); } catch (er) { } setTimeout(() => { try { c.close(); } catch (er) { } }, 400); }
+    saveNow(); renderAll();
+    toast(on ? 'Web joining ON: players can join from a browser or phone (Invite players has the link)' : 'Web joining off: only the app can join');
+  }
+  $('#webBtn').onclick = () => { if (role === 'host' && S) setAllowWeb(!S.allowWeb); };
   $('#inviteBtn').onclick = () => {
     const link = APP_URL ? APP_URL + '#join=' + S.id : '';
     const m = modal('Invite players');
@@ -352,10 +360,7 @@
     const webBox = el('div');
     const drawWeb = () => {
       webBox.textContent = '';
-      const sw = el('input', { type: 'checkbox', checked: !!S.allowWeb, onchange: e => {
-        hostCommit(N.handleRequest(S, { type: 'web.allow', on: e.target.checked }, { id: me.id, isGM: true }));
-        if (!e.target.checked) for (const c of net.conns.values()) if (c.web) { try { c.send({ t: 'err', fatal: true, msg: 'The DM switched off web browser joining. Use the Night City Table app to rejoin.' }); } catch (er) { } setTimeout(() => { try { c.close(); } catch (er) { } }, 400); }
-        saveNow(); drawWeb(); } });
+      const sw = el('input', { type: 'checkbox', checked: !!S.allowWeb, onchange: e => { setAllowWeb(e.target.checked); drawWeb(); } });
       webBox.append(el('div', { class: 'section-h', style: 'margin-top:16px', text: 'Web link (no install)' }),
         el('label', { class: 'row', style: 'gap:8px' }, sw, el('b', { text: 'Allow web browser players' })),
         el('p', { class: 'dim', style: 'font-size:13px', text: S.allowWeb ? 'On: anyone with this link can join from Chrome, Edge, Safari or a phone. Switch it off and web players are disconnected.' : 'Off: players must use the app. Switch on to let people join from a web browser with a link.' }));
@@ -1024,39 +1029,26 @@
 
   // ================= IMPORT (cyberpunk2020character.com) =================
   function bookmarkletHref() {
-    return 'javascript:' + encodeURIComponent('(function(){(' + window.nctGrab.toString() + ')(' + JSON.stringify(APP_URL) + ');})();void 0');
+    const target = DESKTOP ? 'http://127.0.0.1:47820/' : APP_URL; // the app receives characters on this computer
+    return 'javascript:' + encodeURIComponent('(function(){(' + window.nctGrab.toString() + ')(' + JSON.stringify(target) + ');})();void 0');
   }
   function siteImportScript() { return window.nctGrab.toString() + ';\n(' + window.nctSiteHelper.toString() + ')();'; }
   function openImportHelp() {
     const m = modal('Import from cyberpunk2020character.com');
     const href = bookmarkletHref();
-    const ua = navigator.userAgent;
-    const browserTip = DESKTOP ? 'Chrome: right-click the bookmarks bar → Add page. Edge: right-click the favorites bar → Add page. Firefox: right-click the bookmarks bar → Add Bookmark'
-      : /Firefox/.test(ua) ? 'Firefox: right-click the bookmarks bar → Add Bookmark…'
-      : /Edg\//.test(ua) ? 'Edge: right-click the favorites bar → Add page'
-      : /Safari/.test(ua) && !/Chrome|Chromium/.test(ua) ? 'Safari: Bookmarks menu → Add Bookmark, then Edit Address'
-      : 'Chrome: right-click the bookmarks bar → Add page';
+    const bm = DESKTOP ? el('button', { class: 'pink', style: 'width:100%;padding:12px', text: 'Open the drag button in my web browser', onclick: () => window.nctDesktop.openBookmarkPage(href) })
+      : el('a', { class: 'bm', href, onclick: e => { e.preventDefault(); toast("Drag this button to your bookmarks bar (don't click it here)"); } }, '⇩ Send to Night City Table');
     m.append(
-      el('p', { text: 'You make an import bookmark in your web browser once. After that, open your character on the site and click the bookmark.' }),
-      el('div', { class: 'section-h', text: 'Make the bookmark (once)' }),
+      el('div', { class: 'section-h', text: 'Once: put the button on your bookmarks bar' }),
       el('ol', { class: 'steps' },
         el('li', null, 'Show your bookmarks bar: press ', el('b', { text: 'Ctrl+Shift+B' }), ' (', el('b', { text: '⌘+Shift+B' }), ' on Mac).'),
-        el('li', null, 'Press ', el('b', { text: 'Copy bookmark code' }), ' below.', el('div', { style: 'margin:8px 0' }, el('button', { class: 'pink', style: 'width:100%;padding:12px', text: '⧉ Copy bookmark code', onclick: () => copyText(href) }))),
-        el('li', null, 'Add a new bookmark. ', el('span', { class: 'dim', text: browserTip + '.' }), ' Name it ', el('b', { text: 'Send to Night City Table' }), ' and paste the code into the ', el('b', { text: 'URL' }), ' box (delete what was there first), then Save.')),
-      el('div', { class: 'section-h', text: 'Import your character' }),
+        DESKTOP ? el('li', null, 'Click this. It opens a page in your web browser (Chrome, Edge, Firefox…). ', el('b', { text: 'Drag the pink button there onto your bookmarks bar.' }), el('div', { style: 'margin:10px 0' }, bm))
+          : el('li', null, el('b', { text: 'Drag this pink button' }), ' up onto the bookmarks bar:', el('div', { style: 'margin:10px 0' }, bm))),
+      el('div', { class: 'section-h', text: 'Every time: import your character' }),
       el('ol', { class: 'steps' },
-        el('li', null, 'Open your character on ', el('a', { href: 'https://cyberpunk2020character.com', target: '_blank', rel: 'noopener', text: 'cyberpunk2020character.com' }), ' the way you normally do, so you can see your stats.'),
-        el('li', null, 'Click the ', el('b', { text: 'Send to Night City Table' }), ' bookmark. ', DESKTOP ? 'It copies your character. Switch back to this app and it pops up by itself, ready to add.' : 'Your character pops up here, ready to add.')));
-    // second option: a page with a pink button to drag
-    if (DESKTOP) m.append(el('p', { class: 'dim', style: 'font-size:13px' }, 'Prefer dragging? ', el('a', { href: '#', text: 'Open a page with a button to drag onto the bookmarks bar', onclick: e => { e.preventDefault(); window.nctDesktop.openBookmarkPage(href); } }), '.'));
-    else m.append(el('p', { class: 'dim', style: 'font-size:13px' }, 'Or drag this onto the bookmarks bar: ', el('a', { class: 'bm', href, onclick: e => { e.preventDefault(); toast("Drag this button to your bookmarks bar (don't click it here)"); } }, '⇩ Send to Night City Table')));
-    if (!ONLINE && !DESKTOP) m.append(el('p', { class: 'notice', text: "Because this file is running from your computer, the bookmark copies your character instead of sending it. After clicking it, paste below." }));
-    m.append(el('div', { class: 'section-h', text: 'Or paste a character' }),
-      el('p', { class: 'dim', style: 'font-size:14px', text: "The bookmark also copies your character, so if it doesn't pop up, paste it here (Ctrl+V). A saved Night City Table sheet file also works." }));
-    const ta = el('textarea', { style: 'width:100%;height:70px', placeholder: 'Paste here…' });
-    const go = () => { try { const v = ta.value.trim(); handleIncomingCharacter(JSON.parse(v.startsWith('NCT1:') ? v.slice(5) : v)); } catch (e) { toast("That doesn't look like a character. Click the bookmark on your character page again.", true); } };
-    const file = el('input', { type: 'file', accept: '.json', class: 'hidden', onchange: async e => { const f = e.target.files[0]; if (f) { ta.value = await f.text(); go(); } } });
-    m.append(ta, file, el('div', { class: 'row', style: 'margin-top:6px' }, el('button', { class: 'ghost', text: 'Open sheet file…', onclick: () => file.click() }), el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Import', onclick: go })));
+        el('li', null, 'Open your character sheet on ', el('a', { href: 'https://cyberpunk2020character.com', target: '_blank', rel: 'noopener', text: 'cyberpunk2020character.com' }), ' so you can see your stats.'),
+        el('li', null, 'Click the ', el('b', { text: 'Send to Night City Table' }), ' bookmark. ', DESKTOP ? 'A small window says "Sent" and your character pops up here in the app (keep the app open).' : 'Your character pops up here, ready to add.')),
+      DESKTOP ? el('p', { class: 'dim', style: 'font-size:13px', text: "Made the bookmark before this update? Delete it and drag the new one: the old one can't reach the app." }) : null);
   }
   function toSheet(obj) {
     if (obj && obj.type === 'nct-character') return N.fromCP2020Site(obj.data, { playerId: obj.playerId });
@@ -1191,7 +1183,7 @@
     });
     let lastClip = '';
     window.addEventListener('focus', async () => { // character copied by the bookmark button → offer it
-      try { const t = await window.nctDesktop.readClipboard(); if (!t || !t.startsWith('NCT1:')) return; let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; h = String(h) + ':' + t.length; if (h === lastClip || h === LS.get('nct-last-clip', '')) return; lastClip = h; LS.set('nct-last-clip', h); handleIncomingCharacter(JSON.parse(t.slice(5))); } catch (e) { }
+      try { const t = await window.nctDesktop.readClipboard(); if (!t || !t.startsWith('NCT1:') || t === lastClip) return; lastClip = t; window.nctDesktop.writeClipboard(' '); handleIncomingCharacter(JSON.parse(t.slice(5))); setTimeout(() => { lastClip = ''; }, 3000); } catch (e) { }
     });
   }
   if (ONLINE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });

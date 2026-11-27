@@ -52,12 +52,7 @@ fn bookmark_page(href: String) -> Result<(), String> {
 <ol><li>Show your bookmarks bar: press <b>Ctrl+Shift+B</b> (or <b>&#8984;+Shift+B</b> on Mac).</li>\
 <li><b>Drag this pink button</b> up onto the bookmarks bar:<p><a href=\"{esc}\" style=\"display:inline-block;background:#ff2a6d;color:#fff;padding:10px 16px;border-radius:6px;font-weight:700;text-decoration:none\">&#8681; Send to Night City Table</a></p></li>\
 <li>Open your character on <b>cyberpunk2020character.com</b> and click the bookmark.</li>\
-<li>Switch back to the Night City Table app. Your character pops up there.</li></ol>\
-<h2 style=\"color:#05d9e8;font-size:20px\">Dragging doesn't work?</h2>\
-<p>Copy the code, then add a bookmark by hand: right-click the bookmarks bar, choose <b>Add page</b> (Chrome) / <b>Add page</b> on the favorites bar (Edge) / <b>Add Bookmark</b> (Firefox). Name it <b>Send to Night City Table</b>, paste the code into the <b>URL</b> box, and save.</p>\
-<p><button id=\"cp\" style=\"background:#05d9e8;color:#000;border:0;padding:10px 16px;border-radius:6px;font-weight:700;font-size:16px;cursor:pointer\">Copy bookmark code</button></p>\
-<textarea id=\"code\" readonly style=\"width:100%;height:70px;background:#000;color:#7f8;border:1px solid #334\">{esc}</textarea>\
-<script>document.getElementById('cp').onclick=function(){{var t=document.getElementById('code');t.select();var ok=false;try{{ok=document.execCommand('copy')}}catch(e){{}}if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(function(){{}},function(){{}});this.textContent=ok?'Copied!':'Copied (or press Ctrl+C)';}};</script>\
+<li>A small window says <b>Sent</b> and your character pops up in the Night City Table app (keep the app open).</li></ol>\
 <p style=\"color:#8aa0c2\">You can close this page now. You only need to do this once.</p></body>"
     );
     let path = std::env::temp_dir().join("night-city-table-import-button.html");
@@ -225,10 +220,53 @@ fn close_now(window: tauri::WebviewWindow) {
     let _ = window.destroy();
 }
 
+// ---------------- import bookmark → app ----------------
+// The "Send to Night City Table" bookmark reads the character on cyberpunk2020character.com and opens
+// http://127.0.0.1:47820/import?d=<character> in a small window. This tiny server (only reachable from this
+// computer) hands the character to the game and answers with a page that closes itself.
+const IMPORT_PORT: u16 = 47820;
+fn import_server(app: AppHandle) {
+    let listener = match std::net::TcpListener::bind(("127.0.0.1", IMPORT_PORT)) { Ok(l) => l, Err(_) => return };
+    for stream in listener.incoming() {
+        if let Ok(s) = stream { let app = app.clone(); std::thread::spawn(move || handle_import(app, s)); }
+    }
+}
+fn handle_import(app: AppHandle, mut s: std::net::TcpStream) {
+    let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+    let mut buf: Vec<u8> = Vec::new();
+    let mut chunk = [0u8; 65536];
+    loop {
+        match s.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => { buf.extend_from_slice(&chunk[..n]); if buf.windows(4).any(|w| w == b"\r\n\r\n") || buf.len() > 16_000_000 { break; } }
+            Err(_) => break,
+        }
+    }
+    let req = String::from_utf8_lossy(&buf);
+    let target = req.lines().next().unwrap_or("").split_whitespace().nth(1).unwrap_or("/").to_string();
+    let url = tauri::Url::parse(&format!("http://127.0.0.1{}", target)).ok();
+    let mut status = "404 Not Found";
+    let mut body = String::from("Night City Table");
+    if let Some(u) = url {
+        if u.path() == "/ping" { status = "200 OK"; body = "ok".into(); }
+        if u.path() == "/import" {
+            if let Some(d) = u.query_pairs().find(|(k, _)| k == "d").map(|(_, v)| v.into_owned()) {
+                let _ = app.emit_to("main", "nct-site-character", d);
+                if let Some(w) = app.get_webview_window("main") { let _ = w.unminimize(); let _ = w.show(); let _ = w.set_focus(); }
+                status = "200 OK";
+                body = "<!DOCTYPE html><meta charset=\"utf-8\"><title>Sent to Night City Table</title><body style=\"background:#070a12;color:#39ff6a;font:18px/1.5 system-ui,sans-serif;text-align:center;padding:40px 20px\"><h2>&#10003; Sent to Night City Table</h2><p style=\"color:#8aa0c2\">Switch to the app: your character is waiting there. This window closes by itself.</p><script>setTimeout(function(){window.close()},1800)</script></body>".into();
+            }
+        }
+    }
+    let resp = format!("HTTP/1.1 {}\r\nContent-Type: text/html; charset=utf-8\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", status, body.len(), body);
+    let _ = s.write_all(resp.as_bytes());
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![clip_read, clip_write, open_external, bookmark_page, close_now, update_install, open_site_import])
         .setup(|app| {
+            { let h = app.handle().clone(); std::thread::spawn(move || import_server(h)); }
             let version = app.package_info().version.to_string();
             let init = INIT_JS.replace("__VERSION__", &version).replace("__REPO__", REPO).replace("__AUTO_UPDATE__", if CAN_AUTO_UPDATE { "true" } else { "false" });
             let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))

@@ -234,7 +234,7 @@
     const b = blankSheet(s.ownerId);
     const out = Object.assign(b, {
       id: str(s.id || uid(), 20), ownerId: s.ownerId || null, name: str(s.name, 80) || 'Unnamed', handle: str(s.handle, 80),
-      role: ROLES[s.role] ? s.role : str(s.role, 30), portrait: isImg(s.portrait) && String(s.portrait).length < 600000 ? s.portrait : '',
+      role: ROLES[s.role] ? s.role : str(s.role, 30), portrait: isImg(s.portrait) && String(s.portrait).length <= 1048576 ? s.portrait : '',
       specialAbility: clamp(s.specialAbility, 0, 10), humanity: clamp(s.humanity, -100, 200), damage: clamp(s.damage, 0, 41),
       eddies: clamp(s.eddies, -1e9, 1e12), rep: clamp(s.rep, -20, 20), notes: str(s.notes, 20000), source: s.source ? clone(s.source) : null, updatedAt: Date.now()
     });
