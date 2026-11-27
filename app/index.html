@@ -11,177 +11,255 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Night City">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
+/* Night City Table — terminal look modelled on cyberpunk2020character.com.
+   Every colour comes from the active theme (set from JS): --p primary, --s secondary, --t accent, --d dim, --bg background, --glow. */
 :root{
-  --bg:#070a12; --panel:#0d1322; --panel2:#121a2e; --line:#1f2b47; --text:#e6f4ff; --dim:#8aa0c2;
-  --cyan:#05d9e8; --pink:#ff2a6d; --yellow:#f5e663; --green:#3dfc9a; --red:#ff4d4d;
-  --display:'Orbitron','Rajdhani',system-ui,sans-serif; --ui:'Rajdhani',system-ui,'Segoe UI',sans-serif; --mono:'Share Tech Mono',ui-monospace,Consolas,monospace;
+  --p:#00ff00; --s:#00aa00; --t:#ffff00; --d:#004400; --bg:#0d1a0d; --glow:rgba(0,255,0,.4);
+  --text:color-mix(in srgb,var(--p) 78%,#ffffff 22%);
+  --dim:color-mix(in srgb,var(--p) 52%,var(--bg) 48%);
+  --line:color-mix(in srgb,var(--p) 30%,var(--bg) 70%);
+  --panel:color-mix(in srgb,var(--bg) 88%,#000 12%);
+  --panel2:color-mix(in srgb,var(--bg) 70%,var(--p) 6%);
+  --field:color-mix(in srgb,var(--bg) 60%,#000 40%);
+  --cyan:var(--p); --pink:var(--s); --yellow:var(--t);
+  --green:#33ff66; --red:#ff3344;
+  --mono:'Share Tech Mono','Courier New',ui-monospace,monospace;
+  --ui:var(--mono); --display:'Courier New',ui-monospace,monospace;
+  --r:0px; --gl:1;
 }
+body.clean-font{ --ui:system-ui,'Segoe UI',Roboto,sans-serif; --display:system-ui,'Segoe UI',Roboto,sans-serif; }
+body.round{ --r:6px; }
+body.no-glow{ --gl:0; }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.35 var(--ui);overflow:hidden}
+html{font-size:var(--fs,16px)}
+html,body{margin:0;height:100%;background:#000;color:var(--text);font:1rem/1.35 var(--ui);overflow:hidden}
+body{background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--bg) 100%,var(--p) 0%) 0%,#000 75%)}
+body.gridbg{background-image:linear-gradient(color-mix(in srgb,var(--p) 5%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--p) 5%,transparent) 1px,transparent 1px),radial-gradient(ellipse at 50% 0%,var(--bg) 0%,#000 75%);background-size:24px 24px,24px 24px,auto}
+body.crt::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
+::selection{background:var(--p);color:#000}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:#000}::-webkit-scrollbar-thumb{background:var(--d);border:1px solid var(--line)}
+
 button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:6px 12px;border-radius:4px;transition:border-color .15s,box-shadow .15s}
-button:hover{border-color:var(--cyan);box-shadow:0 0 8px #05d9e855}
-button.primary{background:var(--cyan);color:#001318;border-color:var(--cyan);font-weight:700}
-button.primary:hover{box-shadow:0 0 14px var(--cyan)}
-button.pink{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:700}
+button{cursor:pointer;background:color-mix(in srgb,var(--p) 8%,transparent);border:1px solid var(--line);color:var(--p);padding:6px 12px;border-radius:var(--r);text-transform:uppercase;letter-spacing:.04em;font-size:.9rem;transition:border-color .12s,box-shadow .12s,background .12s}
+button:hover{border-color:var(--p);box-shadow:0 0 calc(10px*var(--gl)) var(--glow);background:color-mix(in srgb,var(--p) 14%,transparent)}
+button.primary{background:color-mix(in srgb,var(--p) 18%,transparent);border:2px solid var(--p);color:var(--p);font-weight:700;text-shadow:0 0 calc(6px*var(--gl)) var(--glow)}
+button.primary:hover{background:color-mix(in srgb,var(--p) 28%,transparent)}
+button.pink{background:color-mix(in srgb,var(--s) 16%,transparent);border:2px solid var(--s);color:var(--s);font-weight:700}
+button.pink:hover{box-shadow:0 0 calc(12px*var(--gl)) color-mix(in srgb,var(--s) 60%,transparent)}
 button.ghost{background:transparent}
-button.small{padding:2px 8px;font-size:14px}
-button.danger:hover{border-color:var(--red);box-shadow:0 0 8px #ff4d4d66}
-button:disabled{opacity:.45;cursor:default;box-shadow:none}
-input,select,textarea{background:#060912;border:1px solid var(--line);border-radius:4px;padding:6px 8px;outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--cyan)}
+button.small{padding:2px 8px;font-size:.8rem}
+button.danger:hover,button.danger{color:var(--red);border-color:color-mix(in srgb,var(--red) 60%,transparent)}
+button.danger:hover{box-shadow:0 0 10px color-mix(in srgb,var(--red) 50%,transparent)}
+button:disabled{opacity:.4;cursor:default;box-shadow:none}
+input,select,textarea{background:var(--field);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;outline:none;color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 calc(8px*var(--gl)) var(--glow)}
 input[type=number]{width:64px}
-input:disabled,select:disabled,textarea:disabled{opacity:.8;border-color:transparent;background:transparent}
-label{color:var(--dim);font-size:14px}
-a{color:var(--cyan)}
+input[type=range]{accent-color:var(--p);padding:0;border:0;background:transparent;box-shadow:none}
+input[type=checkbox]{accent-color:var(--p)}
+input[type=color]{padding:0;width:42px;height:30px;cursor:pointer}
+input:disabled,select:disabled,textarea:disabled{opacity:.9;border-color:transparent;background:transparent;color:var(--text)}
+select option{background:#000}
+label{color:var(--dim);font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
+a{color:var(--p)}
 .hidden{display:none!important}
 .row{display:flex;gap:8px;align-items:center}
 .col{display:flex;flex-direction:column;gap:8px}
 .grow{flex:1}
 .dim{color:var(--dim)}
 .mono{font-family:var(--mono)}
-h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.06em}
-.glow{text-shadow:0 0 10px var(--cyan)}
+h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.glow{text-shadow:0 0 calc(10px*var(--gl)) var(--glow)}
+
+/* glowing frame with corner brackets, like the character site */
+.frame{position:relative;border:2px solid var(--p);background:color-mix(in srgb,var(--bg) 80%,transparent);box-shadow:0 0 calc(20px*var(--gl)) var(--glow),inset 0 0 calc(30px*var(--gl)) color-mix(in srgb,var(--p) 5%,transparent);border-radius:var(--r)}
+.frame::before,.frame::after{content:'';position:absolute;width:14px;height:14px;border:3px solid var(--p);pointer-events:none}
+.frame::before{left:-6px;top:-6px;border-right:0;border-bottom:0}
+.frame::after{right:-6px;bottom:-6px;border-left:0;border-top:0}
+.diamond::before{content:'◆ ';color:var(--p)}
 
 /* ---------- home ---------- */
-#home{height:100%;overflow:auto;background:radial-gradient(ellipse at 20% 0%,#16224a 0%,transparent 55%),radial-gradient(ellipse at 100% 100%,#3a0a2a 0%,transparent 50%),var(--bg)}
-.home-wrap{max-width:980px;margin:0 auto;padding:40px 20px 60px}
-.logo{font-family:var(--display);font-size:44px;font-weight:900;letter-spacing:.08em;line-height:1}
-.logo span{color:var(--pink);text-shadow:0 0 18px var(--pink)}
-.logo b{color:var(--cyan);text-shadow:0 0 18px var(--cyan)}
-.tag{color:var(--dim);margin:8px 0 28px;font-size:18px}
+#home{height:100%;overflow:auto}
+.home-wrap{max-width:1040px;margin:30px auto;padding:30px 28px 40px}
+.logo{font-family:var(--display);font-size:2.5rem;font-weight:900;letter-spacing:.06em;line-height:1;color:var(--p);text-shadow:0 0 calc(14px*var(--gl)) var(--glow);text-align:center}
+.logo::before,.logo::after{content:'◆';font-size:.6em;vertical-align:middle;margin:0 .5em}
+.logo span,.logo b{color:inherit}
+.tag{color:var(--dim);margin:10px 0 26px;font-size:.95rem;text-align:center;text-transform:uppercase;letter-spacing:.12em}
+.homebar{display:flex;justify-content:flex-end;gap:8px;margin:-10px 0 10px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:8px;padding:18px;position:relative}
-.card h2{font-size:17px;margin-bottom:12px;color:var(--cyan)}
-.card.pinkc h2{color:var(--pink)}
-.card::before{content:'';position:absolute;left:-1px;top:14px;width:3px;height:28px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-.card.pinkc::before{background:var(--pink);box-shadow:0 0 8px var(--pink)}
+.card{background:color-mix(in srgb,var(--p) 4%,transparent);border:1px solid var(--line);padding:16px;position:relative;border-radius:var(--r)}
+.card h2{font-size:.95rem;margin-bottom:12px;color:var(--p);border-left:3px solid var(--p);padding-left:8px}
+.card h2::before{content:'◆ '}
+.card.pinkc h2{color:var(--s);border-color:var(--s)}
 .gamelist{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto}
-.gameitem{display:flex;align-items:center;gap:8px;background:#0a0f1c;border:1px solid var(--line);padding:8px 10px;border-radius:6px}
-.gameitem .name{font-weight:700}
-.gameitem .meta{font-size:13px;color:var(--dim)}
-.installbar{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#05d9e822,#ff2a6d18);border:1px solid var(--cyan);border-radius:8px;padding:12px 14px;margin:-10px 0 22px;box-shadow:0 0 18px #05d9e822}
-.installbar img{border-radius:10px}
-.notice{border:1px dashed var(--yellow);color:var(--yellow);padding:10px 12px;border-radius:6px;font-size:15px;margin-bottom:16px}
-.help{margin-top:22px;color:var(--dim);font-size:15px}
-.help summary{cursor:pointer;color:var(--text);font-weight:700}
+.gameitem{display:flex;align-items:center;gap:8px;background:var(--field);border:1px solid var(--line);padding:8px 10px;border-radius:var(--r)}
+.gameitem .name{font-weight:700;color:var(--p)}
+.gameitem .meta{font-size:.78rem;color:var(--dim)}
+.notice{border:1px dashed var(--t);color:var(--t);padding:10px 12px;font-size:.9rem;margin-bottom:16px;border-radius:var(--r)}
+.help{margin-top:22px;color:var(--dim);font-size:.9rem}
+.help summary{cursor:pointer;color:var(--p);font-weight:700;text-transform:uppercase}
 .help ol{padding-left:22px}
+.installbar{display:flex;align-items:center;gap:14px;border:1px solid var(--p);padding:12px 14px;margin:0 0 22px;background:color-mix(in srgb,var(--p) 8%,transparent);box-shadow:0 0 calc(14px*var(--gl)) var(--glow);border-radius:var(--r)}
+.installbar img{image-rendering:auto}
 
 /* ---------- table ---------- */
-#table{display:grid;grid-template-rows:48px 1fr;grid-template-columns:52px 1fr 380px;height:100%}
-#topbar{grid-column:1/4;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line)}
-#topbar .title{font-family:var(--display);font-weight:700;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
-.status{font-size:14px;display:flex;align-items:center;gap:6px;color:var(--dim)}
-.dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}
+#table{display:grid;grid-template-rows:50px 1fr;grid-template-columns:52px 1fr 6px var(--side,400px);height:100%}
+#topbar{grid-column:1/5;display:flex;align-items:center;gap:10px;padding:0 12px;background:#000;border-bottom:2px solid var(--p);box-shadow:0 0 calc(16px*var(--gl)) var(--glow);z-index:2}
+#topbar .title{font-family:var(--display);font-weight:700;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;color:var(--p);text-transform:uppercase;text-shadow:0 0 calc(8px*var(--gl)) var(--glow)}
+#topbar .title::before{content:'◆ '}
+.status{font-size:.8rem;display:flex;align-items:center;gap:6px;color:var(--dim);text-transform:uppercase}
+.dot{width:9px;height:9px;background:#555;display:inline-block}
 .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
-.dot.warn{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.dot.warn{background:var(--t);box-shadow:0 0 8px var(--t)}
 .dot.off{background:var(--red);box-shadow:0 0 8px var(--red)}
 #people{display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden}
-.chip{font-size:13px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);display:flex;align-items:center;gap:5px;white-space:nowrap}
-#tools{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0}
-#tools button{width:38px;height:38px;padding:0;font-size:18px;display:flex;align-items:center;justify-content:center}
-#tools button.on{border-color:var(--cyan);box-shadow:0 0 10px #05d9e877;color:var(--cyan)}
-#stage{position:relative;overflow:hidden;background:#05070d}
+.chip{font-size:.78rem;padding:2px 8px;border:1px solid var(--line);display:flex;align-items:center;gap:5px;white-space:nowrap;text-transform:uppercase;border-radius:var(--r)}
+#tools{background:#000;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0}
+#tools button{width:38px;height:38px;padding:0;font-size:1.05rem;display:flex;align-items:center;justify-content:center}
+#tools button.on{border:2px solid var(--p);box-shadow:0 0 calc(10px*var(--gl)) var(--glow);background:color-mix(in srgb,var(--p) 18%,transparent)}
+#stage{position:relative;overflow:hidden;background:#000}
 #canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
-#maphint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--dim);text-align:center;padding:30px;font-size:18px}
+#maphint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--dim);text-align:center;padding:30px;font-size:1.05rem;text-transform:uppercase;letter-spacing:.06em}
 #zoomctl{position:absolute;right:10px;bottom:10px;display:flex;gap:4px}
-#side{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
-#tabs{display:flex;border-bottom:1px solid var(--line)}
-#tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:10px 4px;font-family:var(--display);font-size:12px;letter-spacing:.08em;color:var(--dim);border-bottom:2px solid transparent}
-#tabs button.on{color:var(--cyan);border-bottom-color:var(--cyan);box-shadow:none}
+#nowplaying{position:absolute;left:10px;bottom:10px;font-size:.8rem;color:var(--p);background:#000c;border:1px solid var(--line);padding:4px 10px;display:flex;gap:8px;align-items:center;text-transform:uppercase}
+#splitter{background:var(--line);cursor:col-resize}
+#splitter:hover{background:var(--p);box-shadow:0 0 10px var(--glow)}
+#side{background:#000;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0}
+#tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+#tabs button{flex:1;border:1px solid transparent;border-radius:0;background:transparent;padding:9px 4px;font-family:var(--display);font-size:.72rem;letter-spacing:.06em;color:var(--dim);min-width:58px}
+#tabs button::before{content:'◆ ';color:var(--s)}
+#tabs button.on{color:var(--p);border:2px solid var(--p);background:color-mix(in srgb,var(--p) 12%,transparent);box-shadow:inset 0 0 12px color-mix(in srgb,var(--p) 20%,transparent)}
+#tabs button.on::before{color:var(--p)}
 .pane{flex:1;min-height:0;display:flex;flex-direction:column}
 .pane-scroll{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:10px}
 
 /* chat */
 #chatlog{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
-.msg{background:#0a0f1c;border:1px solid var(--line);border-left:3px solid var(--c,var(--cyan));padding:6px 9px;border-radius:4px;word-wrap:break-word}
-.msg .who{font-weight:700;color:var(--c,var(--cyan));font-size:14px}
-.msg .when{float:right;color:var(--dim);font-size:12px}
-.msg .lbl{color:var(--dim);font-size:14px}
-.msg .total{font-family:var(--display);font-size:26px;font-weight:900;line-height:1.1}
-.msg .brk{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.msg{background:color-mix(in srgb,var(--p) 4%,transparent);border:1px solid var(--line);border-left:3px solid var(--c,var(--p));padding:6px 9px;word-wrap:break-word;border-radius:var(--r)}
+.msg .who{font-weight:700;color:var(--c,var(--p));font-size:.85rem;text-transform:uppercase}
+.msg .when{float:right;color:var(--dim);font-size:.75rem}
+.msg .lbl{color:var(--dim);font-size:.85rem}
+.msg .total{font-family:var(--display);font-size:1.7rem;font-weight:900;line-height:1.1;color:var(--p);text-shadow:0 0 calc(8px*var(--gl)) var(--glow)}
+.msg .brk{font-family:var(--mono);font-size:.8rem;color:var(--dim)}
 .msg.priv{border-style:dashed}
-.badge{font-size:11px;padding:1px 6px;border-radius:3px;font-weight:700;letter-spacing:.05em;margin-left:6px;vertical-align:middle}
-.b-crit{background:var(--yellow);color:#000}
+.badge{font-size:.68rem;padding:1px 6px;font-weight:700;letter-spacing:.05em;margin-left:6px;vertical-align:middle;text-transform:uppercase;border-radius:var(--r)}
+.b-crit{background:var(--t);color:#000}
 .b-fum{background:var(--red);color:#fff}
 .b-ok{background:var(--green);color:#000}
 .b-fail{background:var(--red);color:#fff}
 .b-priv{border:1px solid var(--dim);color:var(--dim)}
+.b-vis{border:1px solid currentColor}
 #chatbox{border-top:1px solid var(--line);padding:8px;display:flex;flex-direction:column;gap:6px}
 #quickdice{display:flex;gap:4px;flex-wrap:wrap}
-#quickdice button{padding:2px 8px;font-size:14px;font-family:var(--mono)}
+#quickdice button{padding:2px 8px;font-size:.8rem;font-family:var(--mono);text-transform:none}
 
 /* lists in panes */
-.item{background:#0a0f1c;border:1px solid var(--line);border-radius:6px;padding:8px;display:flex;gap:8px;align-items:center}
-.item.active{border-color:var(--cyan);box-shadow:0 0 8px #05d9e844}
-.avatar{width:40px;height:40px;border-radius:50%;background:#222 center/cover;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--display);border:2px solid var(--cyan)}
-.section-h{font-family:var(--display);font-size:12px;letter-spacing:.12em;color:var(--pink);margin-top:6px}
-.init-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:#0a0f1c}
-.init-row.cur{border-color:var(--yellow);box-shadow:0 0 10px #f5e66355}
-.init-row .v{font-family:var(--display);font-weight:900;width:36px;text-align:center}
+.item{background:color-mix(in srgb,var(--p) 4%,transparent);border:1px solid var(--line);padding:8px;display:flex;gap:8px;align-items:center;border-radius:var(--r)}
+.item.active{border:2px solid var(--p);box-shadow:0 0 calc(10px*var(--gl)) var(--glow)}
+.avatar{width:40px;height:40px;background:#000 center/cover;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--display);border:2px solid var(--p);color:var(--p);border-radius:var(--r)}
+.section-h{font-family:var(--display);font-size:.78rem;letter-spacing:.1em;color:var(--p);margin-top:6px;border-left:3px solid var(--p);padding-left:8px;text-transform:uppercase}
+.section-h::before{content:'◆ '}
+.init-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);background:color-mix(in srgb,var(--p) 4%,transparent);border-radius:var(--r)}
+.init-row.cur{border:2px solid var(--t);box-shadow:0 0 10px color-mix(in srgb,var(--t) 40%,transparent)}
+.init-row .v{font-family:var(--display);font-weight:900;width:36px;text-align:center;color:var(--p)}
 
 /* modal */
-.overlay{position:fixed;inset:0;background:#000b;display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 12px}
-.modal{background:var(--panel);border:1px solid var(--cyan);box-shadow:0 0 30px #05d9e833;border-radius:8px;width:min(560px,100%);padding:18px;position:relative}
-.modal.wide{width:min(1100px,100%)}
-.modal h2{color:var(--cyan);font-size:18px;margin-bottom:12px}
+.overlay{position:fixed;inset:0;background:#000c;display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 12px}
+.modal{background:color-mix(in srgb,var(--bg) 92%,#000);width:min(560px,100%);padding:18px}
+.modal.wide{width:min(1120px,100%)}
+.modal h2{color:var(--p);font-size:1.05rem;margin-bottom:14px;text-shadow:0 0 calc(8px*var(--gl)) var(--glow)}
+.modal h2::before{content:'◆ '}
 .modal .x{position:absolute;right:10px;top:10px}
 .steps{padding-left:20px}
 .steps li{margin-bottom:10px}
-.bm{display:inline-block;background:var(--pink);color:#fff;padding:8px 14px;border-radius:5px;font-weight:700;text-decoration:none;cursor:grab;box-shadow:0 0 14px #ff2a6d88}
+.bm{display:inline-block;background:color-mix(in srgb,var(--s) 20%,transparent);border:2px solid var(--s);color:var(--s);padding:8px 14px;font-weight:700;text-decoration:none;cursor:grab;box-shadow:0 0 calc(14px*var(--gl)) color-mix(in srgb,var(--s) 50%,transparent);text-transform:uppercase}
 
 /* sheet */
 .sheet{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.sheet .box{background:#0a0f1c;border:1px solid var(--line);border-radius:6px;padding:10px}
-.sheet .box h3{font-size:12px;color:var(--pink);letter-spacing:.14em;margin-bottom:8px}
+.sheet .box{background:color-mix(in srgb,var(--p) 3%,transparent);border:1px solid var(--line);padding:12px;border-radius:var(--r)}
+.sheet .box h3{font-size:.78rem;color:var(--p);letter-spacing:.12em;margin-bottom:10px;border-left:3px solid var(--p);padding-left:8px}
+.sheet .box h3::before{content:'◆ '}
 .sheet .full{grid-column:1/3}
 .shead{display:flex;gap:14px;align-items:flex-start}
-.portrait{width:110px;height:110px;border-radius:8px;border:2px solid var(--cyan);background:#111 center/cover;flex:none;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;text-align:center}
+.portrait{width:110px;height:110px;border:2px solid var(--p);background:#000 center/cover;flex:none;position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:.75rem;text-align:center;text-transform:uppercase;box-shadow:0 0 calc(12px*var(--gl)) var(--glow);border-radius:var(--r)}
 .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat{border:1px solid var(--line);border-radius:6px;padding:6px;text-align:center;background:#070b15}
-.stat .k{font-family:var(--display);font-size:13px;color:var(--cyan);cursor:pointer;letter-spacing:.08em}
-.stat .k:hover{text-shadow:0 0 8px var(--cyan)}
-.stat .v{font-family:var(--display);font-size:24px;font-weight:900}
+.stat{border:1px solid var(--line);padding:8px;background:color-mix(in srgb,var(--p) 4%,transparent);border-radius:var(--r)}
+.stat .top{display:flex;align-items:center;justify-content:space-between}
+.stat .k{font-family:var(--display);font-size:.85rem;color:var(--p);cursor:pointer;letter-spacing:.08em;font-weight:700}
+.stat .k:hover{text-shadow:0 0 8px var(--glow)}
+.stat .v{font-family:var(--display);font-size:1.5rem;font-weight:900;color:var(--p);text-shadow:0 0 calc(6px*var(--gl)) var(--glow)}
 .stat .v.pen{color:var(--red)}
+.stat .bar{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;margin:5px 0}
+.stat .bar i{height:7px;border:1px solid var(--line)}
+.stat .bar i.f{background:var(--p);border-color:var(--p);box-shadow:0 0 calc(4px*var(--gl)) var(--glow)}
+.stat .ins{display:flex;gap:4px;align-items:center;font-size:.72rem;color:var(--dim)}
 .stat input{width:46px;text-align:center;padding:2px}
-.derived{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:14px}
-.derived div b{font-family:var(--display);font-size:16px;color:var(--text)}
+.derived{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:.85rem;color:var(--dim);text-transform:uppercase}
+.derived div b{font-family:var(--display);font-size:1.05rem;color:var(--p)}
 .wounds{display:grid;grid-template-columns:repeat(5,1fr);gap:6px 8px;margin-top:6px}
-.wgrp .wl{font-size:10px;color:var(--dim);letter-spacing:.06em;text-align:center}
+.wgrp .wl{font-size:.62rem;color:var(--dim);letter-spacing:.06em;text-align:center}
 .wgrp .wb{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
-.wbox{height:18px;border:1px solid #2b3a5e;border-radius:2px;cursor:pointer;background:#070b15}
-.wbox.f{background:var(--pink);border-color:var(--pink);box-shadow:0 0 6px #ff2a6d88}
-.spgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;text-align:center;font-size:13px}
+.wbox{height:18px;border:1px solid var(--line);cursor:pointer;background:#000}
+.wbox.f{background:var(--red);border-color:var(--red);box-shadow:0 0 6px color-mix(in srgb,var(--red) 60%,transparent)}
+.spgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;text-align:center;font-size:.8rem}
 .spgrid input{width:100%;text-align:center}
 .skills{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:2px}
-.sk{display:grid;grid-template-columns:1fr 64px 52px 34px 30px;gap:6px;align-items:center;padding:2px 4px;border-radius:3px}
-.sk:hover{background:#111a30}
-.sk.trained .n{color:var(--text);font-weight:700}
-.sk .n{color:var(--dim);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sk .s{font-size:12px;color:var(--cyan);font-family:var(--mono)}
-.sk .t{font-family:var(--display);font-weight:700;text-align:center}
+.sk{display:grid;grid-template-columns:1fr 68px 52px 34px 30px;gap:6px;align-items:center;padding:2px 4px}
+.sk:hover{background:color-mix(in srgb,var(--p) 8%,transparent)}
+.sk.trained .n{color:var(--p);font-weight:700}
+.sk .n{color:var(--dim);font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sk .s{font-size:.75rem;color:var(--s);font-family:var(--mono)}
+.sk .t{font-family:var(--display);font-weight:700;text-align:center;color:var(--p)}
 .sk input{width:52px;padding:2px 4px;text-align:center}
-table.wt{width:100%;border-collapse:collapse;font-size:14px}
-table.wt th{color:var(--dim);font-weight:600;text-align:left;border-bottom:1px solid var(--line);padding:3px}
-table.wt td{padding:3px;border-bottom:1px solid #141d33}
+table.wt{width:100%;border-collapse:collapse;font-size:.85rem}
+table.wt th{color:var(--dim);font-weight:600;text-align:left;border-bottom:1px solid var(--line);padding:3px;text-transform:uppercase;font-size:.72rem}
+table.wt td{padding:3px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
 table.wt input{width:100%;padding:2px 4px}
 .list-ed{display:flex;flex-direction:column;gap:4px}
 .list-ed .r{display:grid;grid-template-columns:1fr 1fr 28px;gap:6px}
 .list-ed .r.cw{grid-template-columns:1fr 50px 1fr 28px}
 
+/* settings */
+.stabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.stabs button.on{border:2px solid var(--p);background:color-mix(in srgb,var(--p) 18%,transparent)}
+.basicthemes{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}
+.basicthemes button{font-size:.75rem;padding:4px 10px;background:transparent}
+.customthemes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:6px}
+.tcard{border:1px solid;padding:8px;text-align:left;cursor:pointer;background:transparent;font-size:.72rem}
+.tcard .sw{display:flex;gap:4px;margin-top:6px}.tcard .sw i{width:12px;height:12px;display:block}
+.tcard.on,.basicthemes button.on{border-width:2px;box-shadow:0 0 12px currentColor}
+.setrow{display:flex;align-items:center;gap:10px;margin:10px 0}
+.setrow > span:first-child{flex:1;color:var(--text)}
+.sharebox{border:1px solid var(--p);background:color-mix(in srgb,var(--p) 8%,transparent);padding:10px;margin-bottom:12px;font-size:.8rem;color:var(--dim)}
+
+/* audio + journal */
+.soundgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+.soundgrid button{text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.8rem}
+.track{display:flex;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r)}
+.track.playing{border:2px solid var(--p);box-shadow:0 0 calc(10px*var(--gl)) var(--glow)}
+.track .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder{border:1px solid var(--line);border-radius:var(--r)}
+.folder > .fh{display:flex;gap:6px;align-items:center;padding:6px 8px;background:color-mix(in srgb,var(--p) 8%,transparent);cursor:pointer;color:var(--p);font-weight:700;text-transform:uppercase;font-size:.85rem}
+.folder > .fb{padding:6px;display:flex;flex-direction:column;gap:4px}
+.entry{display:flex;gap:6px;align-items:center;padding:5px 8px;border:1px solid var(--line);cursor:pointer;border-radius:var(--r)}
+.entry:hover{border-color:var(--p)}
+.entry .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vis-all{color:var(--green)}.vis-gm{color:var(--dim)}.vis-some{color:var(--t)}
+.popover{position:fixed;z-index:60;background:#000;border:2px solid var(--p);box-shadow:0 0 20px var(--glow);padding:12px;min-width:260px}
+
 /* context menu + toast */
-#ctx{position:fixed;z-index:60;background:var(--panel2);border:1px solid var(--cyan);border-radius:6px;padding:4px;min-width:170px;box-shadow:0 0 18px #05d9e833}
+#ctx{position:fixed;z-index:60;background:#000;border:2px solid var(--p);padding:4px;min-width:180px;box-shadow:0 0 18px var(--glow)}
 #ctx button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 10px}
-#ctx button:hover{background:#05d9e822;box-shadow:none}
+#ctx button:hover{background:color-mix(in srgb,var(--p) 18%,transparent);box-shadow:none}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
-#toast div{background:#0b1224;border:1px solid var(--cyan);padding:8px 14px;border-radius:6px;box-shadow:0 0 16px #05d9e855}
-#toast div.err{border-color:var(--red);box-shadow:0 0 16px #ff4d4d55}
+#toast div{background:#000;border:2px solid var(--p);color:var(--p);padding:8px 14px;box-shadow:0 0 16px var(--glow);text-transform:uppercase;font-size:.85rem}
+#toast div.err{border-color:var(--red);color:var(--red);box-shadow:0 0 16px color-mix(in srgb,var(--red) 40%,transparent)}
 #importscreen{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
 
 @media (max-width:900px){
-  #table{grid-template-columns:44px 1fr;grid-template-rows:48px 1fr 45%}
+  #table{grid-template-columns:44px 1fr;grid-template-rows:50px 1fr 45%}
+  #splitter{display:none}
   #side{grid-column:1/3;border-left:0;border-top:1px solid var(--line)}
   .sheet{grid-template-columns:1fr}.sheet .full{grid-column:1}
   #people{display:none}
@@ -193,9 +271,10 @@ table.wt input{width:100%;padding:2px 4px}
 
 <!-- ============ HOME ============ -->
 <div id="home" class="hidden">
-  <div class="home-wrap">
-    <div class="logo"><span>NIGHT</span> <b>CITY</b> TABLE</div>
-    <div class="tag">A free virtual tabletop for Cyberpunk 2020. The DM hosts, everyone else joins with a link.</div>
+  <div class="home-wrap frame">
+    <div class="homebar"><button id="homeSettings" class="small" title="Settings: themes, colours, text size">⚙ Settings</button></div>
+    <div class="logo">NIGHT CITY TABLE</div>
+    <div class="tag">Cyberpunk 2020 virtual tabletop · DM hosts · players join with a code</div>
     <div id="installBar" class="installbar hidden">
       <img src="icon-192.png" alt="" width="44" height="44">
       <div class="grow"><b>Get the app</b><div class="dim" id="installSub">Install Night City Table on this computer. It gets its own icon and window, and updates itself.</div></div>
@@ -254,7 +333,9 @@ table.wt input{width:100%;padding:2px 4px}
     <button id="inviteBtn" class="small primary hidden">Invite players</button>
     <div class="grow"></div>
     <div id="people"></div>
+    <button id="audioBtn" class="small" title="Music and sound volume">🔊</button>
     <button id="backupBtn" class="small ghost hidden" title="Download a backup of this game">Backup</button>
+    <button id="settingsBtn" class="small" title="Settings: themes, colours, text size">⚙</button>
   </div>
   <div id="tools">
     <button data-tool="move" class="on" title="Move tokens / pan (drag empty space)">✥</button>
@@ -266,17 +347,23 @@ table.wt input{width:100%;padding:2px 4px}
   <div id="stage">
     <canvas id="canvas"></canvas>
     <div id="maphint"></div>
+    <div id="nowplaying" class="hidden"></div>
     <div id="zoomctl"><button class="small" id="zoomOut">−</button><button class="small" id="zoomIn">+</button></div>
   </div>
+  <div id="splitter" title="Drag to resize"></div>
   <div id="side">
     <div id="tabs">
       <button data-tab="chat" class="on">CHAT</button>
       <button data-tab="sheets">SHEETS</button>
+      <button data-tab="journal">JOURNAL</button>
       <button data-tab="init">INIT</button>
+      <button data-tab="books">BOOKS</button>
       <button data-tab="maps" class="gmonly">MAPS</button>
+      <button data-tab="audio" class="gmonly">AUDIO</button>
     </div>
     <div class="pane" id="pane-chat">
       <div id="chatlog"></div>
+      <div id="macrobar" class="hidden" style="border-top:1px solid var(--line);padding:6px 8px"></div>
       <div id="chatbox">
         <div id="quickdice">
           <button data-roll="1d10!">d10!</button><button data-roll="1d10">d10</button><button data-roll="1d6">d6</button><button data-roll="2d6">2d6</button><button data-roll="3d6">3d6</button><button data-roll="4d6">4d6</button><button data-roll="1d100">d100</button>
@@ -287,13 +374,16 @@ table.wt input{width:100%;padding:2px 4px}
     </div>
     <div class="pane hidden" id="pane-sheets"><div class="pane-scroll" id="sheetsPane"></div></div>
     <div class="pane hidden" id="pane-init"><div class="pane-scroll" id="initPane"></div></div>
+    <div class="pane hidden" id="pane-journal"><div class="pane-scroll" id="journalPane"></div></div>
+    <div class="pane hidden" id="pane-books"><div class="pane-scroll" id="booksPane"></div></div>
     <div class="pane hidden" id="pane-maps"><div class="pane-scroll" id="mapsPane"></div></div>
+    <div class="pane hidden" id="pane-audio"><div class="pane-scroll" id="audioPane"></div></div>
   </div>
 </div>
 
 <!-- ============ IMPORT RECEIVER (opened by the bookmark button) ============ -->
 <div id="importscreen" class="hidden"><div class="col" style="max-width:520px;align-items:center">
-  <div class="logo" style="font-size:28px"><span>NIGHT</span> <b>CITY</b> TABLE</div>
+  <div class="logo" style="font-size:28px">NIGHT CITY TABLE</div>
   <h2 id="impTitle" style="margin-top:16px">Waiting for character…</h2>
   <p id="impText" class="dim"></p>
 </div></div>
@@ -478,10 +568,25 @@ function nctGrab(APP) {
       id: uid(), ownerId: ownerId || null, name: 'New Character', handle: '', role: 'solo', portrait: '',
       stats, skills, specialAbility: 0, humanity: 50, damage: 0,
       sp: { head: 0, torso: 0, rArm: 0, lArm: 0, rLeg: 0, lLeg: 0 },
-      weapons: [], cyberware: [], gear: [], eddies: 0, rep: 0, notes: '', source: null, updatedAt: Date.now()
+      weapons: [], cyberware: [], gear: [], eddies: 0, rep: 0, notes: '', source: null, updatedAt: Date.now(),
+      macros: [], mods: DEFAULT_MODS.map(m => Object.assign({ id: uid() }, m, { on: false }))
     };
   }
 
+  // ready-made roll modifiers (Cyberpunk 2020 combat), switched on/off per character
+  const DEFAULT_MODS = [
+    { name: 'Aiming', value: '+1', applies: 'hit' }, { name: 'Smartgun link', value: '+2', applies: 'hit' }, { name: 'Laser sight', value: '+1', applies: 'hit' },
+    { name: 'Target immobile', value: '+4', applies: 'hit' }, { name: 'Ambush', value: '+5', applies: 'hit' }, { name: 'Running', value: '-3', applies: 'hit' },
+    { name: 'Fast draw', value: '-3', applies: 'hit' }, { name: 'Called shot', value: '-4', applies: 'hit' }, { name: 'Off hand', value: '-3', applies: 'hit' },
+    { name: 'Blinded / smoke', value: '-3', applies: 'hit' }, { name: 'Melee strength bonus', value: '+0', applies: 'dmg', auto: 'str' }, { name: 'Extra damage die', value: '+1d6', applies: 'dmg' }
+  ];
+  function strBonus(body) { return body <= 2 ? -2 : body <= 4 ? -1 : body <= 7 ? 0 : body <= 9 ? 1 : body === 10 ? 2 : body <= 12 ? 4 : body <= 14 ? 6 : 8; }
+  function cleanModValue(v) {
+    v = String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase(); if (!v) return '+0';
+    if (!/^[+-]/.test(v)) v = '+' + v;
+    try { roll('0' + v); } catch (e) { return null; }
+    return v.slice(0, 20);
+  }
   function statVal(sheet, s) { const v = sheet.stats && sheet.stats[s]; return v ? (Number(v.base) || 0) + (Number(v.mod) || 0) : 0; }
   function woundInfo(dmg) {
     dmg = Number(dmg) || 0;
@@ -566,8 +671,20 @@ function nctGrab(APP) {
     return {
       v: 1, id: code(6), name: str(name || 'New Campaign', 80), createdAt: Date.now(), gmId,
       players: { [gmId]: { id: gmId, name: str(gmName || 'GM', 40), color: '#ff2a6d', isGM: true } },
-      maps: {}, activeMapId: null, chat: [], sheets: {}, init: { list: [], turn: 0 }
+      maps: {}, activeMapId: null, chat: [], sheets: {}, init: { list: [], turn: 0 },
+      journal: { folders: {}, entries: {} },
+      audio: { tracks: {}, music: { playing: false, track: null, startedAt: 0, offset: 0, loop: true, volume: 0.6 } }
     };
+  }
+  // older saves don't have the newer sections
+  function upgrade(state) {
+    if (!state.journal) state.journal = { folders: {}, entries: {} };
+    if (!state.journal.folders) state.journal.folders = {};
+    if (!state.journal.entries) state.journal.entries = {};
+    if (!state.audio) state.audio = { tracks: {}, music: { playing: false, track: null, startedAt: 0, offset: 0, loop: true, volume: 0.6 } };
+    if (!state.audio.tracks) state.audio.tracks = {};
+    if (!state.audio.music) state.audio.music = { playing: false, track: null, startedAt: 0, offset: 0, loop: true, volume: 0.6 };
+    return state;
   }
   function newMap(name, img, w, h) {
     return { id: uid(), name: str(name || 'Map', 80), img: img || '', w: w || 2000, h: h || 1400, grid: { size: 70, show: true, ox: 0, oy: 0, color: '#00f0ff', alpha: 0.25 }, tokens: {}, bg: '#0b0f1a' };
@@ -579,7 +696,7 @@ function nctGrab(APP) {
     switch (op.type) {
       case 'chat': state.chat.push(op.msg); if (state.chat.length > MAX_CHAT) state.chat.splice(0, state.chat.length - MAX_CHAT); break;
       case 'player.upsert': state.players[op.player.id] = Object.assign(state.players[op.player.id] || {}, op.player); break;
-      case 'meta': if (op.name) state.name = op.name; break;
+      case 'meta': if (op.name) state.name = op.name; if (op.theme !== undefined) state.theme = op.theme; break;
       case 'map.add': state.maps[op.map.id] = op.map; if (!state.activeMapId) state.activeMapId = op.map.id; break;
       case 'map.update': if (state.maps[op.id]) { const m = state.maps[op.id]; if (op.patch.grid) m.grid = Object.assign({}, m.grid, op.patch.grid); for (const k of ['name', 'bg', 'img', 'w', 'h']) if (op.patch[k] !== undefined) m[k] = op.patch[k]; } break;
       case 'map.delete': delete state.maps[op.id]; if (state.activeMapId === op.id) state.activeMapId = Object.keys(state.maps)[0] || null; break;
@@ -590,6 +707,13 @@ function nctGrab(APP) {
       case 'sheet.upsert': state.sheets[op.sheet.id] = op.sheet; break;
       case 'sheet.delete': delete state.sheets[op.id]; for (const mid in state.maps) for (const tid in state.maps[mid].tokens) if (state.maps[mid].tokens[tid].sheetId === op.id) state.maps[mid].tokens[tid].sheetId = null; break;
       case 'init.set': state.init = op.init; break;
+      case 'journal.folder.upsert': upgrade(state); state.journal.folders[op.folder.id] = op.folder; break;
+      case 'journal.folder.delete': upgrade(state); delete state.journal.folders[op.id]; for (const id in state.journal.entries) if (state.journal.entries[id].folderId === op.id) state.journal.entries[id].folderId = null; break;
+      case 'journal.entry.upsert': upgrade(state); state.journal.entries[op.entry.id] = op.entry; break;
+      case 'journal.entry.delete': upgrade(state); delete state.journal.entries[op.id]; break;
+      case 'audio.track.upsert': upgrade(state); state.audio.tracks[op.track.id] = op.track; break;
+      case 'audio.track.delete': upgrade(state); delete state.audio.tracks[op.id]; break;
+      case 'music.set': upgrade(state); state.audio.music = op.music; break;
     }
     return state;
   }
@@ -615,7 +739,41 @@ function nctGrab(APP) {
     out.weapons = (Array.isArray(s.weapons) ? s.weapons : []).slice(0, 60).map(w => ({ name: str(w.name, 80), type: str(w.type, 40), wa: clamp(w.wa, -10, 10), damage: str(w.damage, 30), rof: str(w.rof, 10), shots: str(w.shots, 10), range: str(w.range, 12), rel: str(w.rel, 6), skill: str(w.skill || weaponSkill(w.type), 40), notes: str(w.notes, 300) }));
     out.cyberware = (Array.isArray(s.cyberware) ? s.cyberware : []).slice(0, 100).map(c => ({ name: str(c.name, 80), hl: str(c.hl, 10), notes: str(c.notes, 400) }));
     out.gear = (Array.isArray(s.gear) ? s.gear : []).slice(0, 200).map(g => ({ name: str(g.name, 80), notes: str(g.notes, 400) }));
+    if (Array.isArray(s.macros)) out.macros = s.macros.slice(0, 60).map(m => ({ id: str(m.id || uid(), 20), name: str(m.name || 'Macro', 40), formula: str(m.formula, 200), kind: ['hit', 'dmg'].includes(m.kind) ? m.kind : '' }));
+    if (Array.isArray(s.mods)) out.mods = s.mods.slice(0, 60).map(m => ({ id: str(m.id || uid(), 20), name: str(m.name || 'Modifier', 40), value: cleanModValue(m.value) || '+0', applies: ['hit', 'dmg', 'both'].includes(m.applies) ? m.applies : 'hit', on: !!m.on, auto: m.auto === 'str' ? 'str' : undefined }));
     return out;
+  }
+
+  // ---------- journal visibility ----------
+  // vis.mode: 'gm' (DM only), 'all' (everyone), 'some' (DM + the players in vis.ids). Owners always see their own.
+  function canSeeEntry(state, e, pid) {
+    if (!e) return false;
+    if (pid === state.gmId || e.ownerId === pid) return true;
+    const v = e.vis || {};
+    return v.mode === 'all' || (v.mode === 'some' && Array.isArray(v.ids) && v.ids.includes(pid));
+  }
+  function journalView(state, pid) {
+    upgrade(state);
+    const entries = new Set(), folders = new Set();
+    for (const id in state.journal.entries) { const e = state.journal.entries[id]; if (canSeeEntry(state, e, pid)) { entries.add(id); if (e.folderId && state.journal.folders[e.folderId]) folders.add(e.folderId); } }
+    if (pid === state.gmId) for (const id in state.journal.folders) folders.add(id);
+    return { entries, folders };
+  }
+  // what to send one player after journal changes: only what they're allowed to see, and removals for what they lost
+  function journalDiff(state, before, pid, changed) {
+    const after = journalView(state, pid); const out = [];
+    for (const id of after.folders) if (!before.folders.has(id) || changed.has('f:' + id)) out.push({ type: 'journal.folder.upsert', folder: state.journal.folders[id] });
+    for (const id of after.entries) if (!before.entries.has(id) || changed.has('e:' + id)) out.push({ type: 'journal.entry.upsert', entry: state.journal.entries[id] });
+    for (const id of before.entries) if (!after.entries.has(id)) out.push({ type: 'journal.entry.delete', id });
+    for (const id of before.folders) if (!after.folders.has(id)) out.push({ type: 'journal.folder.delete', id });
+    return out;
+  }
+  function cleanVis(v, state) {
+    v = v || {}; const mode = ['gm', 'all', 'some'].includes(v.mode) ? v.mode : 'gm';
+    return { mode, ids: mode === 'some' ? (Array.isArray(v.ids) ? v.ids : []).filter(id => state.players[id]).slice(0, 50) : [] };
+  }
+  function cleanTrack(t) {
+    return { id: str(t.id || uid(), 20), name: str(t.name || 'Track', 80), kind: t.kind === 'sound' ? 'sound' : 'music', url: /^https:\/\//.test(String(t.url || '')) ? str(t.url, 2000) : '', file: !!t.file, size: clamp(t.size || 0, 0, 1e9) };
   }
 
   // ---------- host: turn a request into committed ops ----------
@@ -635,7 +793,7 @@ function nctGrab(APP) {
       case 'roll': {
         let r; try { r = roll(req.formula); } catch (e) { return deny(e.message); }
         const priv = !!req.private;
-        const msg = chatMsg({ label: str(req.label, 120), roll: r, private: priv, to: priv ? [sender.id, state.gmId] : null,
+        const msg = chatMsg({ label: str(req.label, 200), roll: r, private: priv, to: priv ? [sender.id, state.gmId] : null, kind: ['hit', 'dmg'].includes(req.kind) ? req.kind : '', ap: !!req.ap,
           target: (req.target !== undefined && req.target !== null && isFinite(Number(req.target))) ? clamp(req.target, -99, 999) : null });
         out.ops.push({ type: 'chat', msg });
         if (req.init && req.init.name) {
@@ -653,7 +811,13 @@ function nctGrab(APP) {
         out.ops.push({ type: 'player.upsert', player: { id: sender.id, name: str(req.name || p.name || 'Player', 40), color: /^#[0-9a-f]{6}$/i.test(req.color) ? req.color : (p.color || '#05d9e8'), isGM: sender.id === state.gmId } });
         return out;
       }
-      case 'meta': if (!isGM) return deny(); out.ops.push({ type: 'meta', name: str(req.name, 80) }); return out;
+      case 'meta': {
+        if (!isGM) return deny(); const op = { type: 'meta' };
+        if (req.name) op.name = str(req.name, 80);
+        if (req.theme === null) op.theme = null;
+        else if (req.theme) { const t = {}; for (const k of ['p', 's', 't', 'd', 'bg']) if (/^#[0-9a-f]{6}$/i.test(req.theme[k])) t[k] = req.theme[k]; if (t.p && t.bg) op.theme = t; }
+        out.ops.push(op); return out;
+      }
       case 'map.add': {
         if (!isGM) return deny();
         const m = newMap(req.name, isImg(req.img) ? req.img : '', clamp(req.w, 100, 12000), clamp(req.h, 100, 12000));
@@ -722,6 +886,51 @@ function nctGrab(APP) {
         const i = req.init || {}; const list = (Array.isArray(i.list) ? i.list : []).slice(0, 60).map(e => ({ id: str(e.id || uid(), 20), name: str(e.name, 60), value: clamp(e.value, -99, 999), sheetId: e.sheetId || null }));
         out.ops.push({ type: 'init.set', init: { list, turn: clamp(i.turn || 0, 0, Math.max(0, list.length - 1)) } }); return out;
       }
+      case 'journal.folder.upsert': {
+        if (!isGM) return deny(); upgrade(state);
+        const f = req.folder || {}; const ex = f.id && state.journal.folders[f.id];
+        out.ops.push({ type: 'journal.folder.upsert', folder: { id: ex ? ex.id : uid(), name: str(f.name || 'Folder', 80), order: clamp(f.order ?? (ex ? ex.order : Date.now()), 0, 1e15) } }); return out;
+      }
+      case 'journal.folder.delete': if (!isGM) return deny(); out.ops.push({ type: 'journal.folder.delete', id: str(req.id, 20) }); return out;
+      case 'journal.folder.vis': { // show/hide everything in a folder at once
+        if (!isGM) return deny(); upgrade(state);
+        const vis = cleanVis(req.vis, state);
+        for (const id in state.journal.entries) { const e = state.journal.entries[id]; if (e.folderId === req.id && e.ownerId === state.gmId) out.ops.push({ type: 'journal.entry.upsert', entry: Object.assign({}, e, { vis, updatedAt: Date.now() }) }); }
+        return out;
+      }
+      case 'journal.entry.upsert': {
+        upgrade(state);
+        const e = req.entry || {}; const ex = e.id && state.journal.entries[e.id];
+        if (ex && !isGM && ex.ownerId !== sender.id) return deny('Only the person who wrote this (or the DM) can change it');
+        if (!ex && e.id && !isGM) { /* new entry: id is assigned below */ }
+        const folderId = e.folderId && state.journal.folders[e.folderId] ? e.folderId : null;
+        const entry = {
+          id: ex ? ex.id : uid(), title: str(e.title || 'Untitled', 120), body: str(e.body, 50000),
+          img: isImg(e.img) && String(e.img).length < 2000000 ? e.img : '', folderId: isGM ? folderId : (ex ? ex.folderId : null),
+          ownerId: ex ? ex.ownerId : sender.id, vis: cleanVis(e.vis, state), updatedAt: Date.now(), createdAt: ex ? ex.createdAt : Date.now()
+        };
+        out.ops.push({ type: 'journal.entry.upsert', entry }); return out;
+      }
+      case 'journal.entry.delete': {
+        upgrade(state); const ex = state.journal.entries[req.id]; if (!ex) return out;
+        if (!isGM && ex.ownerId !== sender.id) return deny();
+        out.ops.push({ type: 'journal.entry.delete', id: ex.id }); return out;
+      }
+      case 'audio.track.add': if (!isGM) return deny(); { const t = cleanTrack(req.track || {}); if (!t.url && !t.file) return deny('Paste a link that starts with https://'); out.ops.push({ type: 'audio.track.upsert', track: t }); } return out;
+      case 'audio.track.rename': if (!isGM || !state.audio || !state.audio.tracks[req.id]) return deny(); out.ops.push({ type: 'audio.track.upsert', track: Object.assign({}, state.audio.tracks[req.id], { name: str(req.name, 80) }) }); return out;
+      case 'audio.track.delete': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'audio.track.delete', id: str(req.id, 20) });
+        if (state.audio.music.track && state.audio.music.track.id === req.id) out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { playing: false, track: null }) });
+        return out;
+      case 'music.play': {
+        if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such track');
+        out.ops.push({ type: 'music.set', music: { playing: true, track: { id: t.id, name: t.name, url: t.url, file: t.file }, startedAt: Date.now(), offset: clamp(req.offset || 0, 0, 1e6), loop: req.loop !== false, volume: clamp(req.volume ?? state.audio.music.volume ?? 0.6, 0, 1) } }); return out;
+      }
+      case 'music.stop': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { playing: false }) }); return out;
+      case 'music.volume': if (!isGM) return deny(); upgrade(state); out.ops.push({ type: 'music.set', music: Object.assign({}, state.audio.music, { volume: clamp(req.volume, 0, 1) }) }); return out;
+      case 'sound.play': {
+        if (!isGM) return deny(); upgrade(state); const t = state.audio.tracks[req.id]; if (!t) return deny('No such sound');
+        out.transient.push({ type: 'sound', track: { id: t.id, name: t.name, url: t.url, file: t.file }, volume: clamp(req.volume ?? 1, 0, 1) }); return out;
+      }
       case 'ping': out.transient.push({ type: 'ping', x: clamp(req.x, -1e5, 1e5), y: clamp(req.y, -1e5, 1e5), mapId: str(req.mapId, 20), by: sender.id }); return out;
       default: return deny('Unknown action');
     }
@@ -733,6 +942,13 @@ function nctGrab(APP) {
     const s = clone(state);
     s.chat = s.chat.filter(m => !m.to || m.to.includes(playerId));
     for (const id in s.sheets) if (!s.sheets[id].ownerId) delete s.sheets[id];
+    upgrade(s);
+    if (playerId !== s.gmId) {
+      const v = journalView(state, playerId);
+      for (const id in s.journal.entries) if (!v.entries.has(id)) delete s.journal.entries[id];
+      for (const id in s.journal.folders) if (!v.folders.has(id)) delete s.journal.folders[id];
+      s.audio.tracks = {}; // players don't get the DM's sound library, only what's playing
+    }
     return s;
   }
   function canSeeMsg(msg, playerId) { return !msg.to || msg.to.includes(playerId); }
@@ -741,6 +957,7 @@ function nctGrab(APP) {
     for (const o of ops) {
       if (o.type === 'chat' && !canSeeMsg(o.msg, playerId)) continue;
       if (o.type === 'sheet.upsert' && !o.sheet.ownerId) { out.push({ type: 'sheet.delete', id: o.sheet.id }); continue; }
+      if (o.type.startsWith('journal.') || o.type.startsWith('audio.track.')) continue; // journal goes out through journalDiff; the library stays with the DM
       out.push(o);
     }
     return out;
@@ -838,7 +1055,7 @@ function nctGrab(APP) {
   }
 
   root.NCT = { uid, code, clone, roll, rollToText, STATS, SKILLS_BY_STAT, SKILL_STAT, ROLES, LOCS, weaponSkill, blankSheet, statVal, effStat, derived, woundInfo, skillTotal,
-    newCampaign, newMap, apply, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
+    DEFAULT_MODS, strBonus, cleanModValue, newCampaign, newMap, upgrade, apply, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
@@ -887,7 +1104,7 @@ window.peerReady = new Promise(function (resolve) {
   const ago = ts => { const s = (Date.now() - ts) / 1000; if (s < 90) return 'just now'; if (s < 3600) return Math.round(s / 60) + ' min ago'; if (s < 86400) return Math.round(s / 3600) + ' h ago'; return Math.round(s / 86400) + ' days ago'; };
 
   // ---------- identity ----------
-  const me = { id: LS.get('nct-id', null), name: LS.get('nct-name', ''), color: LS.get('nct-color', '#05d9e8') };
+  const me = { id: LS.get('nct-id', null), name: LS.get('nct-name', ''), color: LS.get('nct-color', '#00ff00') };
   if (!me.id) { me.id = 'u' + N.uid(12); LS.set('nct-id', me.id); }
   const DESKTOP = !!window.nctDesktop; // running inside the installed desktop app
   const ONLINE = !DESKTOP && /^https?:$/.test(location.protocol);
@@ -900,20 +1117,23 @@ window.peerReady = new Promise(function (resolve) {
     open() {
       if (this._db) return Promise.resolve(this._db);
       return new Promise((res, rej) => {
-        const r = indexedDB.open('night-city-table', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('games', { keyPath: 'id' });
+        const r = indexedDB.open('night-city-table', 3);
+        r.onupgradeneeded = () => { const db = r.result; for (const n of ['games', 'audio', 'audiocache', 'books', 'booktext']) if (!db.objectStoreNames.contains(n)) db.createObjectStore(n, { keyPath: 'id' }); };
         r.onsuccess = () => { this._db = r.result; res(this._db); };
         r.onerror = () => rej(r.error);
       });
     },
-    tx(mode, fn) { return this.open().then(db => new Promise((res, rej) => { const t = db.transaction('games', mode); const s = t.objectStore('games'); const out = fn(s); t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out); t.onerror = () => rej(t.error); })); },
-    all() { return this.tx('readonly', s => s.getAll()); },
-    get(id) { return this.tx('readonly', s => s.get(id)); },
-    put(g) { return this.tx('readwrite', s => s.put(g)); },
-    del(id) { return this.tx('readwrite', s => s.delete(id)); }
+    tx(store, mode, fn) { return this.open().then(db => new Promise((res, rej) => { const t = db.transaction(store, mode); const out = fn(t.objectStore(store)); t.oncomplete = () => res(out instanceof IDBRequest ? out.result : out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('Storage is full')); })); },
+    all(store) { return this.tx(store || 'games', 'readonly', s => s.getAll()); },
+    get(id, store) { return this.tx(store || 'games', 'readonly', s => s.get(id)); },
+    put(g, store) { return this.tx(store || 'games', 'readwrite', s => s.put(g)); },
+    del(id, store) { return this.tx(store || 'games', 'readwrite', s => s.delete(id)); }
   };
 
   // ---------- runtime state ----------
+  let clockSkew = 0;       // DM's clock minus ours, for keeping music in sync
+  const audioWaiters = new Map();
+  let openEntryId = null;
   let S = null;            // the campaign (host: full truth; player: their view)
   let role = null;         // 'host' | 'client'
   let joinCode = null;
@@ -929,7 +1149,7 @@ window.peerReady = new Promise(function (resolve) {
 
   // ================= HOSTING (DM) =================
   async function hostGame(game) {
-    S = game; role = 'host'; joinCode = S.id;
+    S = N.upgrade(game); role = 'host'; joinCode = S.id; clockSkew = 0;
     if (S.gmId !== me.id) { // opened on a different computer (e.g. from a backup): this browser becomes the DM
       const old = S.players[S.gmId]; if (old) old.isGM = false; S.gmId = me.id;
     }
@@ -973,8 +1193,12 @@ window.peerReady = new Promise(function (resolve) {
       if (pid === S.gmId) { conn.send({ t: 'err', fatal: true, msg: "You're the DM of this game. Open it from the home screen under 'Your games' instead." }); setTimeout(() => conn.close(), 500); return; }
       conn.pid = pid; net.conns.set(conn.peer, conn);
       hostCommit(N.handleRequest(S, { type: 'player.upsert', name: d.name, color: d.color }, { id: pid }));
-      conn.send({ t: 'welcome', you: pid, state: N.viewFor(S, pid) });
+      conn.send({ t: 'welcome', you: pid, state: N.viewFor(S, pid), hostNow: Date.now() });
       broadcastPresence(); updateHostStatus();
+      return;
+    }
+    if (d.t === 'audio.get' && conn.pid) { // a player needs an uploaded music/sound file
+      DB.get(String(d.id), 'audio').then(rec => conn.send({ t: 'audio.data', id: d.id, data: rec ? rec.data : null })).catch(() => conn.send({ t: 'audio.data', id: d.id, data: null }));
       return;
     }
     if (d.t === 'req' && conn.pid) {
@@ -985,10 +1209,15 @@ window.peerReady = new Promise(function (resolve) {
   }
   function hostCommit(res) {
     if (!res || (!res.ops.length && !res.transient.length)) return;
+    // journal: each player only gets what they're allowed to see (and loses what was hidden again)
+    const jOps = res.ops.filter(o => o.type.startsWith('journal.'));
+    const before = new Map();
+    if (jOps.length) for (const conn of net.conns.values()) if (conn.pid && !before.has(conn.pid)) before.set(conn.pid, N.journalView(S, conn.pid));
+    const changed = new Set(jOps.map(o => o.folder ? 'f:' + o.folder.id : o.entry ? 'e:' + o.entry.id : ''));
     for (const op of res.ops) N.apply(S, op);
     for (const conn of net.conns.values()) {
       if (!conn.open || !conn.pid) continue;
-      const ops = N.opsFor(res.ops, conn.pid);
+      const ops = N.opsFor(res.ops, conn.pid).concat(jOps.length ? N.journalDiff(S, before.get(conn.pid), conn.pid, changed) : []);
       try { if (ops.length) conn.send({ t: 'ops', ops }); if (res.transient.length) conn.send({ t: 'fx', fx: res.transient }); } catch (e) { }
     }
     onOps(res.ops); onFx(res.transient);
@@ -1045,10 +1274,11 @@ window.peerReady = new Promise(function (resolve) {
   function clientRecv(d) {
     if (!d || typeof d !== 'object') return;
     if (d.t === 'welcome') {
-      S = d.state; me.id = d.you; setNet('on', 'Connected');
+      S = N.upgrade(d.state); me.id = d.you; setNet('on', 'Connected'); clockSkew = (d.hostNow || Date.now()) - Date.now();
       const joins = LS.get('nct-joins', []).filter(j => j.code !== joinCode); joins.unshift({ code: joinCode, name: S.name, at: Date.now() }); LS.set('nct-joins', joins.slice(0, 12));
-      fitView(true); renderAll(true); checkPendingImport();
+      fitView(true); renderAll(true); checkPendingImport(); applyTheme(); applyMusic();
     } else if (d.t === 'ops' && S) { for (const op of d.ops) N.apply(S, op); onOps(d.ops); }
+    else if (d.t === 'audio.data') { const w = audioWaiters.get(d.id); if (w) { audioWaiters.delete(d.id); w(d.data); } }
     else if (d.t === 'fx') onFx(d.fx);
     else if (d.t === 'presence') { net.online = new Set(d.online || []); renderPeople(); }
     else if (d.t === 'err') { toast(d.msg || 'Not allowed', true); if (d.fatal) leave(); }
@@ -1070,7 +1300,7 @@ window.peerReady = new Promise(function (resolve) {
     try { net.peer && net.peer.destroy(); } catch (e) { }
     net.peer = null; net.conn = null; net.conns.clear(); net.online.clear();
     setTimeout(() => { net.closing = false; }, 50);
-    S = null; role = null; joinCode = null; closeModal();
+    S = null; role = null; joinCode = null; closeModal(); stopAllAudio(); applyTheme();
     history.replaceState(null, '', location.pathname + location.search);
     showHome();
   }
@@ -1151,6 +1381,7 @@ window.peerReady = new Promise(function (resolve) {
     $$('.gmonly').forEach(b => b.classList.toggle('hidden', !isGM()));
     renderPeople();
     renderChat(full);
+    renderMacroBar();
     renderPane();
     draw();
   }
@@ -1160,6 +1391,9 @@ window.peerReady = new Promise(function (resolve) {
       if (op.type === 'map.activate' || op.type === 'map.add' || op.type === 'map.delete') mapChanged = true;
       if (op.type === 'sheet.upsert' && openSheet && openSheet.id === op.sheet.id) refreshOpenSheet(op.sheet);
       if (op.type === 'sheet.delete' && openSheet && openSheet.id === op.id) closeModal();
+      if (op.type === 'music.set') applyMusic();
+      if (op.type === 'meta' && op.theme !== undefined) applyTheme();
+      if (op.type === 'journal.entry.upsert' && openEntryId === op.entry.id) refreshOpenEntry();
     }
     if (mapChanged) fitView(false);
     renderAll(false);
@@ -1215,7 +1449,7 @@ window.peerReady = new Promise(function (resolve) {
   let curTab = 'chat';
   function selectTab(t) { curTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('hidden', p.id !== 'pane-' + t)); renderPane(); }
   $$('#tabs button').forEach(b => b.onclick = () => selectTab(b.dataset.tab));
-  function renderPane() { if (!S) return; if (curTab === 'sheets') renderSheets(); else if (curTab === 'init') renderInit(); else if (curTab === 'maps') renderMaps(); }
+  function renderPane() { if (!S) return; const pn = $('#pane-' + curTab); if (pn && pn.contains(document.activeElement) && document.activeElement.matches('input,textarea,select')) return; if (curTab === 'sheets') renderSheets(); else if (curTab === 'init') renderInit(); else if (curTab === 'maps') renderMaps(); else if (curTab === 'journal') renderJournal(); else if (curTab === 'audio') renderAudio(); else if (curTab === 'books') renderBooks(); }
 
   // ================= CHAT =================
   const renderedMsgs = new Set();
@@ -1236,9 +1470,12 @@ window.peerReady = new Promise(function (resolve) {
       if (r.crit) badges.push(el('span', { class: 'badge b-crit', text: 'CRITICAL!' }));
       if (r.fumble) badges.push(el('span', { class: 'badge b-fum', text: 'FUMBLE' }));
       if (m.target !== null && m.target !== undefined) badges.push(el('span', { class: 'badge ' + (r.total <= m.target ? 'b-ok' : 'b-fail'), text: r.total <= m.target ? 'SUCCESS' : 'FAILED' }));
+      if (m.kind === 'hit') badges.unshift(el('span', { class: 'badge b-vis', style: 'color:var(--p)', text: 'TO-HIT' }));
+      if (m.kind === 'dmg') badges.unshift(el('span', { class: 'badge b-vis', style: 'color:var(--red)', text: 'DAMAGE' }));
       if (m.label) d.appendChild(el('div', { class: 'lbl', text: m.label }));
       d.appendChild(el('div', { class: 'total' }, String(r.total), ...badges));
       d.appendChild(el('div', { class: 'brk', text: N.rollToText(r) }));
+      if (m.kind === 'dmg') d.appendChild(el('button', { class: 'small pink', style: 'margin-top:5px', text: '💥 Apply damage…', title: 'Subtract armor and body type, then add it to a wound track', onclick: () => applyDamageDialog(m) }));
     } else d.appendChild(el('div', { text: m.text }));
     return d;
   }
@@ -1278,7 +1515,7 @@ window.peerReady = new Promise(function (resolve) {
     return null;
   }
   function draw() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#05070d'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
     const m = S && activeMap();
     if (!S) { hint(role === 'client' ? 'Connecting to the DM…' : ''); return; }
     if (!m) { hint(isGM() ? 'No map yet.\nOpen the MAPS tab on the right to upload a map image or make a blank grid.' : 'Waiting for the DM to put up a map…'); return; }
@@ -1295,16 +1532,16 @@ window.peerReady = new Promise(function (resolve) {
       for (let y = oy; y <= m.h; y += g.size) { ctx.moveTo(0, y); ctx.lineTo(m.w, y); }
       ctx.stroke(); ctx.restore();
     }
-    ctx.strokeStyle = '#05d9e855'; ctx.lineWidth = 2 / v.z; ctx.strokeRect(0, 0, m.w, m.h);
+    ctx.strokeStyle = TH.p; ctx.globalAlpha = 0.5; ctx.lineWidth = 2 / v.z; ctx.strokeRect(0, 0, m.w, m.h); ctx.globalAlpha = 1;
     for (const t of visibleTokens(m)) drawToken(t, m, v);
     if (ruler) {
-      ctx.save(); ctx.strokeStyle = '#f5e663'; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
+      ctx.save(); ctx.strokeStyle = TH.t; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
       ctx.beginPath(); ctx.moveTo(ruler.x1, ruler.y1); ctx.lineTo(ruler.x2, ruler.y2); ctx.stroke(); ctx.setLineDash([]);
       const sq = Math.hypot(ruler.x2 - ruler.x1, ruler.y2 - ruler.y1) / g.size;
       const label = sq.toFixed(1) + ' sq ≈ ' + Math.round(sq * 2) + ' m';
-      ctx.font = 'bold ' + (16 / v.z) + 'px Rajdhani, sans-serif'; const tw = ctx.measureText(label).width;
+      ctx.font = 'bold ' + (16 / v.z) + 'px "Share Tech Mono", monospace'; const tw = ctx.measureText(label).width;
       ctx.fillStyle = '#000c'; ctx.fillRect(ruler.x2 + 10 / v.z, ruler.y2 - 22 / v.z, tw + 12 / v.z, 24 / v.z);
-      ctx.fillStyle = '#f5e663'; ctx.fillText(label, ruler.x2 + 16 / v.z, ruler.y2 - 5 / v.z); ctx.restore();
+      ctx.fillStyle = TH.t; ctx.fillText(label, ruler.x2 + 16 / v.z, ruler.y2 - 5 / v.z); ctx.restore();
     }
     const now = performance.now(); pings = pings.filter(p => now - p.t0 < 1600 && p.mapId === m.id);
     for (const p of pings) {
@@ -1326,12 +1563,12 @@ window.peerReady = new Promise(function (resolve) {
     if (img) { ctx.save(); ctx.clip(); const s = Math.max(p / img.naturalWidth, p / img.naturalHeight); const iw = img.naturalWidth * s, ih = img.naturalHeight * s; ctx.drawImage(img, cx - iw / 2, cy - ih / 2, iw, ih); ctx.restore(); }
     else {
       ctx.fillStyle = t.color + '55'; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '700 ' + (p * 0.38) + 'px Orbitron, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff'; ctx.font = '700 ' + (p * 0.38) + 'px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText((t.name || (sh && sh.name) || '?').replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?', cx, cy + 1);
     }
     ctx.lineWidth = Math.max(2 / v.z, p * 0.05); ctx.strokeStyle = t.color; if (t.hidden) ctx.setLineDash([6 / v.z, 4 / v.z]);
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    if (selected === t.id) { ctx.strokeStyle = '#f5e663'; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(cx, cy, r + 5 / v.z, 0, Math.PI * 2); ctx.stroke(); }
+    if (selected === t.id) { ctx.strokeStyle = TH.t; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(cx, cy, r + 5 / v.z, 0, Math.PI * 2); ctx.stroke(); }
     if (sh && sh.damage > 0) {
       const bw = p * 0.9, bh = Math.max(4 / v.z, p * 0.08), k = Math.min(1, sh.damage / 40);
       ctx.fillStyle = '#000a'; ctx.fillRect(cx - bw / 2, y + p + 1 / v.z, bw, bh);
@@ -1339,15 +1576,15 @@ window.peerReady = new Promise(function (resolve) {
     }
     const label = t.name || (sh && sh.name) || '';
     if (label) {
-      const fs = Math.max(11 / v.z, Math.min(p * 0.24, 22 / v.z)); ctx.font = '700 ' + fs + 'px Rajdhani, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      const fs = Math.max(11 / v.z, Math.min(p * 0.24, 22 / v.z)); ctx.font = '700 ' + fs + 'px "Share Tech Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       const tw = ctx.measureText(label).width; const ly = y + p + (sh && sh.damage > 0 ? p * 0.1 + 3 / v.z : 3 / v.z);
       ctx.fillStyle = '#000b'; ctx.fillRect(cx - tw / 2 - 4 / v.z, ly, tw + 8 / v.z, fs * 1.15);
-      ctx.fillStyle = '#e6f4ff'; ctx.fillText(label, cx, ly + fs * 0.05);
+      ctx.fillStyle = TH.p; ctx.fillText(label, cx, ly + fs * 0.05);
     }
     ctx.restore();
   }
   function onFx(list) {
-    for (const f of list || []) if (f.type === 'ping') { pings.push({ x: f.x, y: f.y, mapId: f.mapId, t0: performance.now(), color: playerColor(f.by) }); draw(); }
+    for (const f of list || []) if (f.type === 'sound') playSound(f.track, f.volume); else if (f.type === 'ping') { pings.push({ x: f.x, y: f.y, mapId: f.mapId, t0: performance.now(), color: playerColor(f.by) }); draw(); }
   }
   function snap(v, size, off) { return Math.round((v - off) / size) * size + off; }
 
@@ -1393,7 +1630,7 @@ window.peerReady = new Promise(function (resolve) {
   $('#zoomIn').onclick = () => zoomBy(1.25); $('#zoomOut').onclick = () => zoomBy(0.8); $('#centerBtn').onclick = () => fitView(true);
   $$('#tools button[data-tool]').forEach(b => b.onclick = () => { tool = b.dataset.tool; $$('#tools button[data-tool]').forEach(x => x.classList.toggle('on', x === b)); });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); closeModal(); closeCtx(); return; }
+    if (e.key === 'Escape') { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); closeModal(); closeCtx(); $$('.popover').forEach(p => p.remove()); return; }
     if (e.target.matches('input,textarea,select')) return;
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected && activeMap()) { const t = activeMap().tokens[selected]; if (t && canMoveToken(t)) { request({ type: 'token.delete', mapId: activeMap().id, id: t.id }); selected = null; } }
   });
@@ -1562,7 +1799,7 @@ window.peerReady = new Promise(function (resolve) {
   function modal(title, wide) {
     closeModal();
     const ov = el('div', { class: 'overlay', id: 'overlay', onclick: e => { if (e.target.id === 'overlay') closeModal(); } });
-    const m = el('div', { class: 'modal' + (wide ? ' wide' : '') }, el('button', { class: 'small ghost x', text: '✕', onclick: closeModal }), el('h2', { text: title }));
+    const m = el('div', { class: 'modal frame' + (wide ? ' wide' : '') }, el('button', { class: 'small ghost x', text: '✕', onclick: closeModal }), el('h2', { text: title }));
     ov.appendChild(m); document.body.appendChild(ov); return m;
   }
   function closeModal() { const o = $('#overlay'); if (o) o.remove(); openSheet = null; }
@@ -1610,9 +1847,10 @@ window.peerReady = new Promise(function (resolve) {
     const stats = el('div', { class: 'statgrid' }, ...N.STATS.map(st => {
       const base = s.stats[st].base, mod = s.stats[st].mod, eff = N.effStat(s, st), raw = N.statVal(s, st);
       return el('div', { class: 'stat' },
-        el('div', { class: 'k', title: 'Click to roll 1d10! + ' + st, text: st, onclick: () => rollReq('1d10!' + sign(eff), s.name + ': ' + st + ' check (' + eff + ')') }),
-        el('div', { class: 'v' + (eff < raw ? ' pen' : ''), text: String(eff) }),
-        el('div', { class: 'row', style: 'justify-content:center;gap:3px' }, inp(base, v => { s.stats[st].base = v; }, { type: 'number', title: 'Base' }), inp(mod, v => { s.stats[st].mod = v; }, { type: 'number', title: 'Temporary modifier (drugs, cyberware, etc.)' })));
+        el('div', { class: 'top' }, el('div', { class: 'k', title: 'Click to roll 1d10! + ' + st, text: st, onclick: () => rollReq('1d10!' + sign(eff), s.name + ': ' + st + ' check (' + eff + ')') }),
+          el('div', { class: 'v' + (eff < raw ? ' pen' : ''), text: String(eff) })),
+        el('div', { class: 'bar' }, ...Array.from({ length: 10 }, (_, i) => el('i', { class: i < Math.min(10, eff) ? 'f' : '' }))),
+        el('div', { class: 'ins' }, 'BASE', inp(base, v => { s.stats[st].base = v; }, { type: 'number', title: 'Base' }), 'TEMP', inp(mod, v => { s.stats[st].mod = v; }, { type: 'number', title: 'Temporary modifier (drugs, cyberware, etc.)' })));
     }));
     const statBox = el('div', { class: 'box' }, el('h3', { text: 'STATS · CLICK A STAT TO ROLL (BASE / MODIFIER)' }), stats);
 
@@ -1672,13 +1910,21 @@ window.peerReady = new Promise(function (resolve) {
       wt.appendChild(el('tr', null, cell('name'), cell('type'), cell('wa', { type: 'number', style: 'width:46px' }), cell('damage'), cell('rof', { style: 'width:40px' }), cell('shots', { style: 'width:44px' }), cell('range', { style: 'width:54px' }),
         el('td', null, el('select', { disabled: !ed, onchange: change(v => { w.skill = v; }) }, ...['Handgun', 'Submachinegun', 'Rifle', 'Heavy Weapons', 'Melee', 'Fencing', 'Brawling', 'Martial Arts', 'Archery', 'Athletics'].map(k => el('option', { value: k, text: k, selected: k === w.skill })))),
         el('td', { style: 'white-space:nowrap' },
-          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA', onclick: () => rollReq('1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')') }), ' ',
-          el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage, onclick: () => { const f = String(w.damage || '').replace(/D/g, 'd').replace(/\s+/g, ''); try { N.roll(f); rollReq(f, (w.name || 'Weapon') + ' damage'); } catch (e) { toast('Damage "' + w.damage + '" isn\'t a dice formula like 2d6+3', true); } } }),
+          el('button', { class: 'small primary', text: 'Attack ' + sign(atk), title: '1d10! + REF + ' + w.skill + ' + WA, plus your switched-on to-hit toggles', onclick: () => rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon') + ' (REF ' + N.effStat(s, 'REF') + ' + ' + w.skill + ' ' + skv + ' + WA ' + (Number(w.wa) || 0) + ')', 'hit') }), ' ',
+          el('button', { class: 'small pink', text: 'Dmg', title: 'Roll damage ' + w.damage + ', plus your switched-on damage toggles', onclick: () => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg', { ap: /\bAP\b/i.test(w.notes || '') }) }), ' ',
+          el('button', { class: 'small', text: 'Both', title: 'Roll the attack and the damage together', onclick: () => { rollWithMods(s, '1d10!' + sign(atk), s.name + ' attacks with ' + (w.name || 'weapon'), 'hit'); setTimeout(() => rollWithMods(s, String(w.damage || '').replace(/D/g, 'd'), (w.name || 'Weapon') + ' damage', 'dmg'), 150); } }),
           ed ? el('button', { class: 'small ghost', text: '✕', onclick: () => { s.weapons.splice(i, 1); saveSheetSoon(); renderSheetModal(false); } }) : null)));
     });
     const weapBox = el('div', { class: 'box full' }, el('h3', { text: 'WEAPONS' }), s.weapons.length ? wt : el('div', { class: 'dim', text: 'No weapons.' }),
       ed ? el('button', { class: 'small', style: 'margin-top:6px', text: '+ Add weapon', onclick: () => { s.weapons.push({ name: 'New weapon', type: 'Pistol', wa: 0, damage: '2d6+1', rof: '2', shots: '10', range: '50m', rel: 'ST', skill: 'Handgun', notes: '' }); saveSheetSoon(); renderSheetModal(false); } }) : null);
 
+    // macros & toggles
+    const macBox = el('div', { class: 'box full' }, el('h3', { text: 'MACROS & ROLL TOGGLES' }),
+      el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' }, ...(s.macros || []).map(mc => el('button', { class: 'small primary', style: 'text-transform:none', title: mc.formula + (ed ? ' (right-click to edit)' : ''), text: '▶ ' + mc.name, onclick: () => runMacro(s, mc), oncontextmenu: e => { e.preventDefault(); if (ed) editMacroDialog(s, mc, () => openSheetModal(s.id)); } })),
+        ed ? el('button', { class: 'small ghost', text: '+ New macro', onclick: () => editMacroDialog(s, null, () => openSheetModal(s.id)) }) : null),
+      el('div', { class: 'dim', style: 'font-size:.78rem;margin:8px 0 4px', text: 'Toggles: switched-on ones (●) are added to attacks and damage rolls automatically.' }),
+      modChips(s, ed, () => { saveSheetSoon(); renderSheetModal(false); }),
+      ed ? el('button', { class: 'small ghost', style: 'margin-top:6px', text: 'Edit toggles…', onclick: () => editModsDialog(s, () => openSheetModal(s.id)) }) : null);
     // cyberware & gear
     const listBox = (title, arr, cols, add) => el('div', { class: 'box' }, el('h3', { text: title }),
       el('div', { class: 'list-ed' }, ...(arr.length ? arr.map((it, i) => el('div', { class: 'r' + (cols.length === 3 ? ' cw' : '') }, ...cols.map(([k, ph, w]) => inp(it[k], v => { it[k] = v; }, { placeholder: ph, style: w ? 'width:' + w : '' })),
@@ -1691,7 +1937,7 @@ window.peerReady = new Promise(function (resolve) {
       ed ? el('button', { class: 'ghost', text: 'Download sheet', onclick: () => downloadJSON(s, s.name.replace(/[^\w-]+/g, '_') + '.nct-character.json') }) : null,
       ed ? el('button', { class: 'ghost danger', text: 'Delete character', onclick: () => askConfirm('Delete ' + s.name + '?', 'This character sheet is removed for everyone.', 'Delete', () => request({ type: 'sheet.delete', id: s.id })) }) : null,
       el('button', { class: 'primary', text: 'Done', onclick: closeModal }));
-    m.appendChild(el('div', { class: 'sheet' }, head, statBox, deriv, skillBox, el('div', { class: 'col' }, cyberBox, gearBox), weapBox, notes, foot));
+    m.appendChild(el('div', { class: 'sheet' }, head, statBox, deriv, macBox, skillBox, el('div', { class: 'col' }, cyberBox, gearBox), weapBox, notes, foot));
     openSheet = s;
     ov.scrollTop = scroll; const sk = $('.skills', ov); if (sk) sk.scrollTop = skScroll;
     if (!ed && first) toast("You can view this character but only its owner or the DM can change it.");
@@ -1791,6 +2037,605 @@ window.peerReady = new Promise(function (resolve) {
           el('button', { class: 'primary', text: 'Open Night City Table', onclick: () => { location.href = location.pathname; } }));
       }, 1500);
     });
+  }
+
+  // ================= THEMES & SETTINGS (look of cyberpunk2020character.com) =================
+  const BASIC_THEMES = {
+    'retro-green': { p: '#00ff00', s: '#00aa00', d: '#004400', bg: '#0d1a0d', label: 'TERMINAL GREEN' },
+    'neon-amber': { p: '#ffaa00', s: '#aa7700', d: '#443300', bg: '#1a150d', label: 'B33H1VE' },
+    'cyber-cyan': { p: '#00ffff', s: '#00aaaa', d: '#004444', bg: '#0d1a1a', label: 'CYBER CYAN' },
+    'retro-red': { p: '#ff3333', s: '#aa2222', d: '#440000', bg: '#1a0d0d', label: 'BLEEDING EDGE' },
+    'neon-purple': { p: '#cc66ff', s: '#9944cc', d: '#330044', bg: '#150d1a', label: 'NEON NIGHTS' },
+    'retro-blue': { p: '#3399ff', s: '#2266aa', d: '#002244', bg: '#0d121a', label: 'ELECTRIC BLUE' },
+    'clean-white': { p: '#ffffff', s: '#aaaaaa', d: '#444444', bg: '#1a1a1a', label: 'CLEAN WHITE' },
+    'hot-pink': { p: '#ff69b4', s: '#cc5599', d: '#441133', bg: '#1a0d15', label: 'HOT PINK' },
+    'toxic-yellow': { p: '#ffff00', s: '#aaaa00', d: '#444400', bg: '#1a1a0d', label: 'TOXIC YELLOW' },
+    'matrix-green': { p: '#39ff14', s: '#2eb810', d: '#1a4d0a', bg: '#0a1a05', label: 'MATRIX' }
+  };
+  const CUSTOM_THEMES = {
+    'night-city-neon': { p: '#ff00ff', s: '#00ffff', t: '#ffff00', d: '#1a0033', bg: '#0a0014', label: 'NIGHT CITY NEON' },
+    'arasaka-corporate': { p: '#ff0040', s: '#ffffff', t: '#cccccc', d: '#330011', bg: '#0d0005', label: 'ARASAKA CORP' },
+    'militech-tactical': { p: '#00ff00', s: '#ff6600', t: '#ffcc00', d: '#1a2200', bg: '#0a0f05', label: 'MILITECH OPS' },
+    'netrunner-ice': { p: '#00ffff', s: '#0088ff', t: '#ffffff', d: '#002244', bg: '#000a14', label: 'NETRUNNER ICE' },
+    'trauma-team': { p: '#ff3333', s: '#ffffff', t: '#00ff00', d: '#440000', bg: '#0f0505', label: 'TRAUMA TEAM' },
+    'johnny-silverhand': { p: '#ffaa00', s: '#ff3333', t: '#ffffff', d: '#332200', bg: '#0f0a00', label: 'SILVERHAND' },
+    'maelstrom-chrome': { p: '#ff3300', s: '#cccccc', t: '#ff0000', d: '#331100', bg: '#0a0500', label: 'MAELSTROM' },
+    'tyger-claws': { p: '#ff66ff', s: '#00ff88', t: '#ffff00', d: '#330033', bg: '#0a000a', label: 'TYGER CLAWS' },
+    'valentinos': { p: '#ff0066', s: '#ffcc00', t: '#ffffff', d: '#330022', bg: '#0f0008', label: 'VALENTINOS' },
+    'voodoo-boys': { p: '#00ffaa', s: '#ff00ff', t: '#ffff00', d: '#003322', bg: '#000a08', label: 'VOODOO BOYS' },
+    '6th-street': { p: '#ff6600', s: '#3366ff', t: '#ffffff', d: '#332200', bg: '#0a0500', label: '6TH STREET' },
+    'synthwave-sunset': { p: '#ff6699', s: '#9933ff', t: '#ffcc00', d: '#330033', bg: '#0a0010', label: 'SYNTHWAVE' }
+  };
+  const SET_DEFAULT = { theme: 'retro-green', custom: { p: '#00ff00', s: '#00aa00', t: '#ffff00', d: '#004400', bg: '#0d1a0d' }, fontSize: 16, font: 'terminal', glow: true, crt: false, grid: true, round: false, side: 400, followDM: true };
+  let settings = Object.assign({}, SET_DEFAULT, LS.get('nct-settings', {}));
+  let TH = { p: '#00ff00', s: '#00aa00', t: '#ffff00', d: '#004400', bg: '#0d1a0d' };
+  const saveSettings = () => LS.set('nct-settings', settings);
+  function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  function currentTheme() {
+    if (S && S.theme && settings.followDM && !isGM()) return S.theme;
+    if (settings.theme === 'custom') return settings.custom;
+    return BASIC_THEMES[settings.theme] || CUSTOM_THEMES[settings.theme] || BASIC_THEMES['retro-green'];
+  }
+  function applyTheme() {
+    const t = currentTheme();
+    TH = { p: t.p, s: t.s || t.p, t: t.t || '#ffff00', d: t.d || '#004400', bg: t.bg || '#0d1a0d' };
+    const r = document.documentElement.style;
+    r.setProperty('--p', TH.p); r.setProperty('--s', TH.s); r.setProperty('--t', TH.t); r.setProperty('--d', TH.d); r.setProperty('--bg', TH.bg);
+    r.setProperty('--glow', hexA(TH.p, 0.4)); r.setProperty('--fs', settings.fontSize + 'px'); r.setProperty('--side', settings.side + 'px');
+    const b = document.body.classList;
+    b.toggle('clean-font', settings.font === 'clean'); b.toggle('no-glow', !settings.glow); b.toggle('crt', !!settings.crt); b.toggle('gridbg', !!settings.grid); b.toggle('round', !!settings.round);
+    const mc = document.querySelector('meta[name=theme-color]'); if (mc) mc.setAttribute('content', TH.bg);
+    if (!$('#table').classList.contains('hidden')) resizeCanvas();
+  }
+  function openSettings(tab) {
+    const m = modal('Customization', true); m.classList.add('frame');
+    const tabs = ['Themes', 'Create your own', 'Display']; tab = tab || 'Themes';
+    m.append(el('div', { class: 'stabs' }, ...tabs.map(t => el('button', { class: t === tab ? 'on' : '', text: t, onclick: () => openSettings(t) }))));
+    const set = (patch, followOff) => { Object.assign(settings, patch); if (followOff) settings.followDM = false; saveSettings(); applyTheme(); openSettings(tab); };
+    if (tab === 'Themes') {
+      if (S && isGM()) m.append(el('div', { class: 'sharebox' }, 'Your look is saved on this computer. Share it to make it the look for everyone at the table (players can still pick their own).',
+        el('div', { class: 'row', style: 'margin-top:8px' }, el('button', { class: 'primary grow', text: 'Share theme with players', onclick: () => { request({ type: 'meta', theme: currentTheme() }); toast('Theme shared with players'); } }),
+          S.theme ? el('button', { text: 'Stop sharing', onclick: () => { request({ type: 'meta', theme: null }); toast('Players see their own themes again'); } }) : null)));
+      if (S && !isGM() && S.theme) m.append(el('div', { class: 'sharebox' }, el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: settings.followDM, onchange: e => set({ followDM: e.target.checked }) }), "Use the DM's theme for this game")));
+      const active = !(S && S.theme && settings.followDM && !isGM()) ? settings.theme : null;
+      m.append(el('label', { text: 'Basic colors' }), el('div', { class: 'basicthemes' }, ...Object.entries(BASIC_THEMES).map(([k, t]) =>
+        el('button', { class: k === active ? 'on' : '', style: 'color:' + t.p + ';border-color:' + t.p + (k === active ? ';background:' + hexA(t.p, 0.15) : ''), text: t.label, onclick: () => set({ theme: k }, true) }))));
+      m.append(el('label', { text: 'Custom themes' }), el('div', { class: 'customthemes' }, ...Object.entries(CUSTOM_THEMES).map(([k, t]) =>
+        el('button', { class: 'tcard' + (k === active ? ' on' : ''), style: 'color:' + t.p + ';border-color:' + hexA(t.p, k === active ? 1 : 0.4) + ';background:' + (k === active ? hexA(t.p, 0.12) : t.bg), onclick: () => set({ theme: k }, true) },
+          t.label, el('div', { class: 'sw' }, ...[t.p, t.s, t.t].map(c => el('i', { style: 'background:' + c })))))));
+    } else if (tab === 'Create your own') {
+      const c = Object.assign({}, settings.custom);
+      const pick = (k, label) => el('div', { class: 'setrow' }, el('span', { text: label }), el('input', { type: 'color', value: c[k], oninput: e => { c[k] = e.target.value; settings.custom = Object.assign({}, c); settings.theme = 'custom'; settings.followDM = false; saveSettings(); applyTheme(); } }));
+      m.append(el('p', { class: 'dim', text: 'Pick your own colours. Changes show right away.' }),
+        pick('p', 'Main colour (text, borders, glow)'), pick('s', 'Second colour (buttons, highlights)'), pick('t', 'Accent (criticals, warnings)'), pick('bg', 'Background tint'), pick('d', 'Dim colour (empty bars)'),
+        el('div', { class: 'row' }, el('button', { text: 'Start from current theme', onclick: () => { settings.custom = Object.assign({}, TH); set({ theme: 'custom' }, true); } })));
+    } else {
+      const row = (label, ctrl) => el('div', { class: 'setrow' }, el('span', { text: label }), ctrl);
+      m.append(
+        row('Text size: ' + settings.fontSize + 'px', el('input', { type: 'range', min: 12, max: 22, step: 1, value: settings.fontSize, onchange: e => set({ fontSize: Number(e.target.value) }) })),
+        row('Font', el('select', { onchange: e => set({ font: e.target.value }) }, el('option', { value: 'terminal', text: 'Terminal (like the character site)', selected: settings.font === 'terminal' }), el('option', { value: 'clean', text: 'Clean (easier to read)', selected: settings.font === 'clean' }))),
+        row('Glow effects', el('input', { type: 'checkbox', checked: settings.glow, onchange: e => set({ glow: e.target.checked }) })),
+        row('CRT scanlines', el('input', { type: 'checkbox', checked: settings.crt, onchange: e => set({ crt: e.target.checked }) })),
+        row('Grid background', el('input', { type: 'checkbox', checked: settings.grid, onchange: e => set({ grid: e.target.checked }) })),
+        row('Rounded corners', el('input', { type: 'checkbox', checked: settings.round, onchange: e => set({ round: e.target.checked }) })),
+        row('Side panel width: ' + settings.side + 'px (or drag its edge)', el('input', { type: 'range', min: 300, max: 760, step: 10, value: settings.side, onchange: e => set({ side: Number(e.target.value) }) })),
+        el('div', { class: 'row', style: 'margin-top:12px' }, el('div', { class: 'grow' }), el('button', { class: 'danger', text: 'Reset everything', onclick: () => { settings = Object.assign({}, SET_DEFAULT); saveSettings(); applyTheme(); openSettings(tab); } })));
+    }
+  }
+  $('#settingsBtn').onclick = () => openSettings();
+  $('#homeSettings').onclick = () => openSettings();
+  // drag the edge of the side panel to resize it
+  (function () {
+    const sp = $('#splitter'); let drag = null;
+    sp.addEventListener('pointerdown', e => { drag = { x: e.clientX, w: settings.side }; sp.setPointerCapture(e.pointerId); });
+    sp.addEventListener('pointermove', e => { if (!drag) return; settings.side = Math.max(300, Math.min(Math.round(innerWidth * 0.7), drag.w - (e.clientX - drag.x))); document.documentElement.style.setProperty('--side', settings.side + 'px'); resizeCanvas(); });
+    sp.addEventListener('pointerup', () => { if (drag) { drag = null; saveSettings(); } });
+  })();
+
+  // ================= MUSIC & SOUND =================
+  const vol = Object.assign({ music: 0.8, sfx: 0.9, mute: false }, LS.get('nct-vol', {}));
+  const musicEl = new Audio(); musicEl.preload = 'auto';
+  const srcCache = new Map(); // track id -> playable url
+  let audioBlocked = false;
+  function dataToBlobUrl(data) {
+    const [head, b64] = String(data).split(','); const mime = (head.match(/data:([^;]+)/) || [])[1] || 'audio/mpeg';
+    const bin = atob(b64); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([arr], { type: mime }));
+  }
+  async function trackSrc(track) {
+    if (!track) return null;
+    if (track.url) return track.url;
+    if (srcCache.has(track.id)) return srcCache.get(track.id);
+    let data = null;
+    try { const rec = await DB.get(track.id, role === 'host' ? 'audio' : 'audiocache'); data = rec && rec.data; } catch (e) { }
+    if (!data && role === 'client' && net.conn && net.conn.open) {
+      data = await new Promise(res => { audioWaiters.set(track.id, res); net.conn.send({ t: 'audio.get', id: track.id }); setTimeout(() => { if (audioWaiters.has(track.id)) { audioWaiters.delete(track.id); res(null); } }, 120000); });
+      if (data) DB.put({ id: track.id, data, at: Date.now() }, 'audiocache').catch(() => { });
+    }
+    if (!data) return null;
+    const u = dataToBlobUrl(data); srcCache.set(track.id, u); return u;
+  }
+  function tryPlay(a) { const p = a.play(); if (p && p.catch) p.catch(() => { audioBlocked = true; renderNowPlaying(); }); }
+  async function applyMusic() {
+    if (!S || !S.audio) return;
+    const m = S.audio.music;
+    musicEl.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (m.volume ?? 0.6) * vol.music));
+    if (!m.playing || !m.track) { musicEl.pause(); renderNowPlaying(); return; }
+    const src = await trackSrc(m.track);
+    if (!src) { renderNowPlaying("Couldn't load " + m.track.name); return; }
+    if (S.audio.music !== m) return; // changed while loading
+    musicEl.loop = !!m.loop;
+    const pos = () => { let t = (m.offset || 0) + (Date.now() + clockSkew - m.startedAt) / 1000; if (m.loop && musicEl.duration > 0 && isFinite(musicEl.duration)) t = t % musicEl.duration; return Math.max(0, t); };
+    if (musicEl.dataset.key !== m.track.id + '@' + m.startedAt) {
+      musicEl.dataset.key = m.track.id + '@' + m.startedAt; musicEl.src = src;
+      musicEl.onloadedmetadata = () => { try { const t = pos(); if (!m.loop && musicEl.duration && t >= musicEl.duration) return; musicEl.currentTime = t; } catch (e) { } tryPlay(musicEl); };
+    } else if (musicEl.paused) tryPlay(musicEl);
+    renderNowPlaying();
+  }
+  async function playSound(track, v) {
+    const src = await trackSrc(track); if (!src) return;
+    const a = new Audio(src); a.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (v ?? 1) * vol.sfx)); tryPlay(a);
+  }
+  function stopAllAudio() { musicEl.pause(); musicEl.removeAttribute('src'); musicEl.dataset.key = ''; renderNowPlaying(); }
+  function renderNowPlaying(msg) {
+    const box = $('#nowplaying'); box.textContent = '';
+    const m = S && S.audio && S.audio.music;
+    if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Click to turn on sound', onclick: () => { audioBlocked = false; tryPlay(musicEl); renderNowPlaying(); } })); return; }
+    if (!m || !m.playing || !m.track) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden'); box.append('♪ ' + (msg || m.track.name));
+  }
+  $('#audioBtn').onclick = e => {
+    const old = $('.popover'); if (old) { old.remove(); return; }
+    const r = e.target.getBoundingClientRect();
+    const box = el('div', { class: 'popover', style: 'top:' + (r.bottom + 6) + 'px;right:' + Math.max(8, innerWidth - r.right) + 'px' });
+    const slider = (k, label) => el('div', { class: 'setrow' }, el('span', { text: label }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: vol[k], oninput: ev => { vol[k] = Number(ev.target.value); LS.set('nct-vol', vol); applyMusic(); } }));
+    const m = S && S.audio && S.audio.music;
+    box.append(el('div', { class: 'section-h', text: 'Your volume' }), slider('music', 'Music'), slider('sfx', 'Sound effects'),
+      el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: vol.mute, onchange: ev => { vol.mute = ev.target.checked; LS.set('nct-vol', vol); applyMusic(); } }), 'Mute everything'),
+      el('div', { class: 'dim', style: 'font-size:.8rem;margin-top:6px', text: m && m.playing && m.track ? 'Now playing: ' + m.track.name : 'Nothing playing right now.' }));
+    document.body.appendChild(box);
+    setTimeout(() => document.addEventListener('pointerdown', function off(ev) { if (!box.contains(ev.target) && ev.target !== $('#audioBtn')) { box.remove(); document.removeEventListener('pointerdown', off); } }), 0);
+  };
+  function fixAudioLink(u) {
+    u = String(u || '').trim();
+    if (/dropbox\.com/.test(u)) u = u.replace(/[?&]dl=0/, '').replace(/\?$/, '') + (u.includes('?') ? '&' : '?') + 'raw=1';
+    const g = u.match(/drive\.google\.com\/file\/d\/([^/]+)/); if (g) u = 'https://drive.google.com/uc?export=download&id=' + g[1];
+    return u;
+  }
+  function addAudioFiles(kind) {
+    const inp = el('input', { type: 'file', accept: 'audio/*,.mp3,.wav,.ogg,.m4a,.flac,.webm', multiple: true });
+    inp.onchange = async () => {
+      const max = kind === 'sound' ? 8 : 25;
+      for (const f of inp.files) {
+        if (f.size > max * 1048576) { toast(f.name + ' is too big (max ' + max + ' MB). For long music, use a link instead.', true); continue; }
+        const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+        const id = N.uid();
+        try { await DB.put({ id, data, name: f.name, size: f.size }, 'audio'); } catch (e) { toast('Not enough space to save ' + f.name, true); continue; }
+        request({ type: 'audio.track.add', track: { id, name: f.name.replace(/\.[^.]+$/, ''), kind, file: true, size: f.size } });
+      }
+      toast('Added ' + inp.files.length + ' file' + (inp.files.length === 1 ? '' : 's'));
+    };
+    inp.click();
+  }
+  function renderAudio() {
+    const box = $('#audioPane'); box.textContent = ''; if (!isGM()) return;
+    const tracks = Object.values(S.audio.tracks); const m = S.audio.music;
+    const music = tracks.filter(t => t.kind === 'music'), sounds = tracks.filter(t => t.kind === 'sound');
+    const nm = el('input', { class: 'grow', placeholder: 'Name, e.g. Afterlife bar' }), url = el('input', { class: 'grow', placeholder: 'Link to an audio file (https://…mp3)' });
+    const addLink = kind => { const u = fixAudioLink(url.value); if (/youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast('That link is a web page, not an audio file. Use a direct link to an .mp3 (a Dropbox or Google Drive share link works) or upload the file.', true); return; } request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
+    box.append(el('div', { class: 'section-h', text: 'Music (plays for everyone, loops)' }),
+      el('div', { class: 'col' }, nm, url, el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '+ Add music link', onclick: () => addLink('music') }), el('button', { class: 'grow', text: '⬆ Upload music', onclick: () => addAudioFiles('music') }))),
+      el('div', { class: 'setrow' }, el('span', { text: 'Music volume for everyone' }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: m.volume ?? 0.6, onchange: e => request({ type: 'music.volume', volume: Number(e.target.value) }) })));
+    if (m.playing && m.track) box.append(el('div', { class: 'row' }, el('span', { class: 'grow', text: '♪ Now playing: ' + m.track.name }), el('button', { class: 'danger', text: '■ Stop', onclick: () => request({ type: 'music.stop' }) })));
+    if (!music.length) box.append(el('div', { class: 'dim', text: 'No music yet. Paste a link to an mp3 (Dropbox and Google Drive share links work) or upload files.' }));
+    for (const t of music) box.append(el('div', { class: 'track' + (m.playing && m.track && m.track.id === t.id ? ' playing' : '') },
+      el('span', { class: 'nm', text: (t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
+      el('button', { class: 'small primary', text: '▶', title: 'Play for everyone', onclick: () => request({ type: 'music.play', id: t.id, loop: true }) }),
+      el('button', { class: 'small ghost', text: '✎', title: 'Rename', onclick: () => askText('Rename', t.name, n => request({ type: 'audio.track.rename', id: t.id, name: n })) }),
+      el('button', { class: 'small ghost danger', text: '✕', onclick: () => askConfirm('Delete "' + t.name + '"?', '', 'Delete', () => { request({ type: 'audio.track.delete', id: t.id }); if (t.file) DB.del(t.id, 'audio').catch(() => { }); }) })));
+    box.append(el('div', { class: 'section-h', text: 'Sound effects (click to play for everyone)' }),
+      el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '⬆ Upload sounds (mp3, wav, ogg)', onclick: () => addAudioFiles('sound') }), el('button', { class: 'grow', text: '+ From the link above', onclick: () => addLink('sound') })));
+    if (!sounds.length) box.append(el('div', { class: 'dim', text: 'No sounds yet. Upload gunshots, alarms, door sounds… Right-click a sound to rename or delete it.' }));
+    box.append(el('div', { class: 'soundgrid' }, ...sounds.map(t => el('button', { text: '🔊 ' + t.name, title: 'Play for everyone (right-click for options)', onclick: () => request({ type: 'sound.play', id: t.id }),
+      oncontextmenu: e => { e.preventDefault(); askConfirm('Sound: ' + t.name, 'Rename or delete this sound.', 'Delete', () => { request({ type: 'audio.track.delete', id: t.id }); if (t.file) DB.del(t.id, 'audio').catch(() => { }); }); const mm = $('#overlay .modal .row'); if (mm) mm.prepend(el('button', { text: 'Rename', onclick: () => { closeModal(); askText('Rename sound', t.name, n => request({ type: 'audio.track.rename', id: t.id, name: n })); } })); } }))));
+    box.append(el('p', { class: 'dim', style: 'font-size:.8rem', text: "Uploaded files are stored on your computer and sent to players the first time they're played (players keep a copy after that, so it's instant next time). Players control their own volume with the 🔊 button." }));
+  }
+
+  // ================= JOURNAL (shared, with show/hide) & PRIVATE NOTEPAD =================
+  const visLabel = e => e.vis.mode === 'all' ? ['EVERYONE', 'vis-all'] : e.vis.mode === 'some' ? [(e.vis.ids || []).map(playerName).join(', ') || 'CHOSEN PLAYERS', 'vis-some'] : [e.ownerId === S.gmId ? 'DM ONLY' : (e.ownerId === me.id ? 'YOU + DM' : 'ONLY YOU'), 'vis-gm'];
+  const folderOpen = LS.get('nct-folders-open', {});
+  function renderJournal() {
+    const box = $('#journalPane'); box.textContent = '';
+    const J = S.journal; const entries = Object.values(J.entries).sort((a, b) => a.title.localeCompare(b.title));
+    box.append(el('div', { class: 'row', style: 'flex-wrap:wrap' },
+      el('button', { class: 'primary grow', text: '+ New entry', onclick: () => openEntry(null) }),
+      isGM() ? el('button', { class: 'grow', text: '+ Folder', onclick: () => askText('New folder name', '', n => request({ type: 'journal.folder.upsert', folder: { name: n } })) }) : null,
+      el('button', { class: 'pink grow', text: '📝 My notepad', onclick: openNotepad })));
+    const entryRow = e => { const [vl, vc] = visLabel(e); return el('div', { class: 'entry', onclick: () => openEntry(e.id) },
+      e.img ? el('span', { text: '🖼' }) : el('span', { text: '▤' }), el('span', { class: 'nm', text: e.title }),
+      e.ownerId !== S.gmId ? el('span', { class: 'dim', style: 'font-size:.72rem', text: playerName(e.ownerId) }) : null,
+      (isGM() || e.ownerId === me.id) ? el('span', { class: 'badge b-vis ' + vc, text: vl }) : null); };
+    const folders = Object.values(J.folders).sort((a, b) => (a.order || 0) - (b.order || 0));
+    for (const f of folders) {
+      const inF = entries.filter(e => e.folderId === f.id); const open = folderOpen[f.id] !== false;
+      const allShown = inF.length && inF.every(e => e.vis.mode === 'all');
+      box.append(el('div', { class: 'folder' },
+        el('div', { class: 'fh', onclick: () => { folderOpen[f.id] = !open; LS.set('nct-folders-open', folderOpen); renderJournal(); } },
+          el('span', { text: (open ? '▾ ' : '▸ ') + f.name, class: 'grow' }), el('span', { class: 'dim', text: String(inF.length) }),
+          isGM() ? el('button', { class: 'small', text: allShown ? 'Hide all' : 'Show all', title: allShown ? 'Hide everything in this folder from players' : 'Show everything in this folder to all players', onclick: ev => { ev.stopPropagation(); request({ type: 'journal.folder.vis', id: f.id, vis: { mode: allShown ? 'gm' : 'all' } }); } }) : null,
+          isGM() ? el('button', { class: 'small ghost', text: '✎', onclick: ev => { ev.stopPropagation(); askText('Rename folder', f.name, n => request({ type: 'journal.folder.upsert', folder: { id: f.id, name: n } })); } }) : null,
+          isGM() ? el('button', { class: 'small ghost danger', text: '✕', onclick: ev => { ev.stopPropagation(); askConfirm('Delete folder "' + f.name + '"?', "Entries inside aren't deleted. They move to Unsorted.", 'Delete', () => request({ type: 'journal.folder.delete', id: f.id })); } }) : null),
+        open ? el('div', { class: 'fb' }, ...(inF.length ? inF.map(entryRow) : [el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Empty' })])) : null));
+    }
+    const loose = entries.filter(e => !e.folderId || !J.folders[e.folderId]);
+    const dmLoose = loose.filter(e => e.ownerId === S.gmId), plLoose = loose.filter(e => e.ownerId !== S.gmId);
+    if (dmLoose.length) box.append(el('div', { class: 'section-h', text: isGM() ? 'Unsorted' : 'From the DM' }), ...dmLoose.map(entryRow));
+    if (plLoose.length) box.append(el('div', { class: 'section-h', text: 'Player notes' }), ...plLoose.map(entryRow));
+    if (!entries.length && !folders.length) box.append(el('p', { class: 'dim', text: isGM() ? 'Write handouts, NPC files, clues and maps here. Each one can be DM only, shown to everyone, or shown to chosen players, and you can change that any time.' : 'Handouts the DM shows you appear here. You can also write notes for everyone, or just for you and the DM.' }));
+    box.append(el('p', { class: 'dim', style: 'font-size:.78rem', text: '📝 My notepad is private. It stays on this computer and nobody else can see it.' }));
+  }
+  function openEntry(id) {
+    const ex = id && S.journal.entries[id];
+    const mine = !ex || ex.ownerId === me.id || isGM();
+    const e = ex ? N.clone(ex) : { title: '', body: '', img: '', folderId: null, vis: { mode: isGM() ? 'gm' : 'gm', ids: [] } };
+    openEntryId = ex ? ex.id : null;
+    const m = modal(ex ? e.title : 'New entry', true); m.classList.add('frame');
+    if (!mine) { // read-only handout
+      if (e.img) m.append(el('img', { src: e.img, style: 'max-width:100%;max-height:60vh;display:block;margin:0 auto 12px;border:2px solid var(--p)' }));
+      m.append(el('div', { style: 'white-space:pre-wrap;line-height:1.5', text: e.body || '' }), el('p', { class: 'dim', style: 'font-size:.8rem;margin-top:14px', text: 'Written by ' + playerName(e.ownerId) }));
+      return;
+    }
+    const title = el('input', { class: 'grow', value: e.title, placeholder: 'Title', style: 'font-size:1.1rem' });
+    const body = el('textarea', { style: 'width:100%;min-height:260px;line-height:1.5', value: e.body, placeholder: isGM() ? 'Handout text, clue, NPC file…' : 'Your note…' });
+    let img = e.img;
+    const imgBox = el('div');
+    const drawImg = () => { imgBox.textContent = ''; if (img) imgBox.append(el('img', { src: img, style: 'max-width:100%;max-height:300px;display:block;border:2px solid var(--p);margin-bottom:6px' }), el('button', { class: 'small danger', text: 'Remove picture', onclick: () => { img = ''; drawImg(); } })); };
+    drawImg();
+    const mode = el('select', null,
+      el('option', { value: 'gm', text: isGM() ? 'Hidden: DM only' : 'Only me and the DM', selected: e.vis.mode === 'gm' }),
+      el('option', { value: 'all', text: 'Shown to everyone', selected: e.vis.mode === 'all' }),
+      el('option', { value: 'some', text: 'Shown to chosen players…', selected: e.vis.mode === 'some' }));
+    const picks = el('div', { class: 'row', style: 'flex-wrap:wrap' });
+    const chosen = new Set(e.vis.ids || []);
+    const drawPicks = () => { picks.textContent = ''; if (mode.value !== 'some') return; const ps = Object.values(S.players).filter(p => p.id !== S.gmId && p.id !== me.id); if (!ps.length) picks.append(el('span', { class: 'dim', text: 'No players have joined yet.' })); for (const p of ps) picks.append(el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: chosen.has(p.id), onchange: ev => { ev.target.checked ? chosen.add(p.id) : chosen.delete(p.id); } }), p.name)); };
+    mode.onchange = drawPicks; drawPicks();
+    const folder = isGM() ? el('select', null, el('option', { value: '', text: '— Unsorted —' }), ...Object.values(S.journal.folders).map(f => el('option', { value: f.id, text: f.name, selected: f.id === e.folderId }))) : null;
+    const save = () => { request({ type: 'journal.entry.upsert', entry: { id: ex ? ex.id : undefined, title: title.value.trim() || 'Untitled', body: body.value, img, folderId: folder ? (folder.value || null) : e.folderId, vis: { mode: mode.value, ids: [...chosen] } } }); closeModal(); openEntryId = null; toast('Saved'); };
+    m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, title),
+      el('div', { class: 'row', style: 'flex-wrap:wrap;margin-bottom:6px' }, el('label', { text: 'Who can see it' }), mode, folder ? el('label', { text: 'Folder' }) : null, folder), picks,
+      el('div', { style: 'margin:10px 0' }, imgBox, el('button', { class: 'small', text: '🖼 Add / change picture', onclick: () => pickImage(1600, u => { img = u; drawImg(); }) })),
+      body,
+      el('div', { class: 'row', style: 'margin-top:10px' },
+        ex ? el('button', { class: 'danger', text: 'Delete', onclick: () => askConfirm('Delete "' + e.title + '"?', '', 'Delete', () => { request({ type: 'journal.entry.delete', id: ex.id }); openEntryId = null; }) }) : null,
+        el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Cancel', onclick: () => { closeModal(); openEntryId = null; } }), el('button', { class: 'primary', text: 'Save', onclick: save })));
+    setTimeout(() => (ex ? body : title).focus(), 0);
+  }
+  function refreshOpenEntry() { /* another person changed the entry you are reading: show the new version if you're only reading */ const ov = $('#overlay'); if (ov && !ov.querySelector('textarea')) openEntry(openEntryId); }
+  function openNotepad() {
+    const key = 'nct-notepad-' + (S ? S.id : 'x');
+    const m = modal('My notepad (private)', true); m.classList.add('frame');
+    const ta = el('textarea', { style: 'width:100%;min-height:55vh;line-height:1.5', value: LS.get(key, ''), placeholder: 'Anything you like: plans, suspicions, names, phone numbers… Only you can see this. It stays on this computer.' });
+    let t = null; ta.oninput = () => { clearTimeout(t); t = setTimeout(() => LS.set(key, ta.value), 400); };
+    m.append(el('p', { class: 'dim', style: 'font-size:.8rem', text: 'Saved automatically on this computer only, for this game. Not even the ' + (isGM() ? 'players' : 'DM') + ' can see it.' }), ta);
+    setTimeout(() => ta.focus(), 0);
+  }
+  applyTheme();
+
+  // ================= MACROS, MODIFIER TOGGLES & DAMAGE =================
+  // Macro formulas use dice plus @tokens: @REF (a stat), @Handgun or @{Dodge & Escape} (a skill), @SA (special ability), @BTM, @STR (melee strength bonus)
+  function resolveFormula(sh, f) {
+    let bad = null;
+    const val = name => {
+      const n = name.trim(); const up = n.toUpperCase();
+      if (N.STATS.includes(up)) return N.effStat(sh, up);
+      if (up === 'BT' || up === 'BOD') return N.effStat(sh, 'BODY');
+      if (up === 'SA' || up === 'SPECIAL') return sh.specialAbility || 0;
+      if (up === 'BTM') return N.derived(sh).btm;
+      if (up === 'STR') return N.strBonus(N.statVal(sh, 'BODY'));
+      const sk = sh.skills.find(k => k.name.toLowerCase() === n.toLowerCase()) || sh.skills.find(k => k.name.toLowerCase().startsWith(n.toLowerCase()));
+      if (sk) return Number(sk.value) || 0;
+      bad = n; return 0;
+    };
+    let out = String(f || '').replace(/@\{([^}]+)\}|@([A-Za-z][A-Za-z/]*)/g, (m, a, b) => '(' + val(a || b) + ')');
+    out = out.replace(/\(\s*(-?\d+)\s*\)/g, (m, n) => n).replace(/\s+/g, '').replace(/\+\+/g, '+').replace(/\+-/g, '-').replace(/--/g, '+').replace(/-\+/g, '-');
+    if (bad) throw new Error('Unknown @' + bad + '. Use a stat (@REF), a skill (@Handgun or @{Dodge & Escape}), @SA, @BTM or @STR');
+    return out;
+  }
+  function modValue(sh, m) { return m.auto === 'str' ? sign(N.strBonus(N.statVal(sh, 'BODY'))) : m.value; }
+  function activeMods(sh, kind) { return (sh.mods || []).filter(m => m.on && (m.applies === kind || m.applies === 'both') && modValue(sh, m) !== '+0'); }
+  // rolls a formula with the character's switched-on modifiers added automatically
+  function rollWithMods(sh, formula, label, kind, extra) {
+    let f; try { f = resolveFormula(sh, formula); } catch (e) { toast(e.message, true); return; }
+    const mods = kind ? activeMods(sh, kind) : [];
+    for (const m of mods) f += modValue(sh, m);
+    try { N.roll(f); } catch (e) { toast('"' + formula + '" isn\'t a roll like 1d10! + @REF + 2', true); return; }
+    rollReq(f, label + (mods.length ? ' [' + mods.map(m => m.name + ' ' + modValue(sh, m)).join(', ') + ']' : ''), Object.assign({ kind, sheetId: sh.id }, extra || {}));
+  }
+  function saveSheetNow(sh) { request({ type: 'sheet.upsert', sheet: N.clone(sh) }); }
+  function toggleMod(sh, id) { const m = (sh.mods || []).find(x => x.id === id); if (!m) return; m.on = !m.on; saveSheetNow(sh); }
+  function modChips(sh, editable, onChange) {
+    const wrap = el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' });
+    for (const m of sh.mods || []) {
+      const v = modValue(sh, m);
+      wrap.append(el('button', { class: 'small' + (m.on ? ' primary' : ' ghost'), title: (m.applies === 'hit' ? 'Added to to-hit rolls' : m.applies === 'dmg' ? 'Added to damage rolls' : 'Added to to-hit and damage rolls') + (editable ? ' · click to switch on/off' : ''),
+        style: 'text-transform:none', disabled: !editable, onclick: () => { m.on = !m.on; onChange(); } },
+        (m.on ? '● ' : '○ ') + m.name + ' ' + v + (m.applies === 'dmg' ? ' dmg' : m.applies === 'both' ? ' all' : '')));
+    }
+    return wrap;
+  }
+  function editModsDialog(sh, done) {
+    const m = modal('Roll modifiers: ' + sh.name, true);
+    const list = el('div', { class: 'col' });
+    const draw = () => {
+      list.textContent = '';
+      (sh.mods || []).forEach((md, i) => list.append(el('div', { class: 'row' },
+        el('input', { type: 'checkbox', checked: md.on, title: 'On', onchange: e => { md.on = e.target.checked; } }),
+        el('input', { class: 'grow', value: md.name, oninput: e => { md.name = e.target.value; } }),
+        md.auto === 'str' ? el('span', { class: 'mono', style: 'width:80px', text: modValue(sh, md) + ' (BODY)' }) : el('input', { value: md.value, style: 'width:80px', title: 'e.g. +2, -3, +1d6', oninput: e => { md.value = e.target.value; } }),
+        el('select', { onchange: e => { md.applies = e.target.value; } }, ...[['hit', 'To-hit'], ['dmg', 'Damage'], ['both', 'Both']].map(([v, l]) => el('option', { value: v, text: l, selected: md.applies === v }))),
+        el('button', { class: 'small ghost danger', text: '✕', onclick: () => { sh.mods.splice(i, 1); draw(); } }))));
+    };
+    draw();
+    m.append(el('p', { class: 'dim', style: 'font-size:.85rem', text: "Switched-on modifiers are added to this character's rolls automatically: to-hit ones to attacks, damage ones to damage. Values can be numbers (+2, -3) or dice (+1d6)." }), list,
+      el('div', { class: 'row', style: 'margin-top:10px' },
+        el('button', { text: '+ Add modifier', onclick: () => { sh.mods = sh.mods || []; sh.mods.push({ id: N.uid(), name: 'New modifier', value: '+1', applies: 'hit', on: true }); draw(); } }),
+        el('button', { class: 'ghost', text: 'Add the standard ones back', onclick: () => { sh.mods = sh.mods || []; for (const d of N.DEFAULT_MODS) if (!sh.mods.some(x => x.name === d.name)) sh.mods.push(Object.assign({ id: N.uid(), on: false }, d)); draw(); } }),
+        el('div', { class: 'grow' }),
+        el('button', { class: 'primary', text: 'Save', onclick: () => { for (const md of sh.mods) { const v = N.cleanModValue(md.value); if (v === null) { toast('"' + md.value + '" isn\'t a modifier like +2 or +1d6', true); return; } md.value = v; } saveSheetNow(sh); closeModal(); if (done) done(); } })));
+  }
+  function editMacroDialog(sh, macro, done) {
+    const isNew = !macro; macro = macro || { id: N.uid(), name: '', formula: '1d10! + @REF + @Handgun', kind: 'hit' };
+    const m = modal(isNew ? 'New macro' : 'Edit macro');
+    const name = el('input', { class: 'grow', value: macro.name, placeholder: 'Button name, e.g. Shoot' });
+    const f = el('input', { class: 'grow mono', value: macro.formula });
+    const kind = el('select', null, ...[['hit', 'To-hit roll (adds to-hit toggles)'], ['dmg', 'Damage roll (adds damage toggles)'], ['', 'Other roll (no toggles)']].map(([v, l]) => el('option', { value: v, text: l, selected: macro.kind === v })));
+    const preview = el('div', { class: 'mono dim', style: 'font-size:.85rem;min-height:1.2em' });
+    const upd = () => { try { const r = resolveFormula(sh, f.value); N.roll(r); preview.textContent = '= ' + r; preview.style.color = ''; } catch (e) { preview.textContent = e.message || 'Not a valid roll yet'; preview.style.color = 'var(--red)'; } };
+    f.oninput = upd; upd();
+    m.append(el('div', { class: 'col' }, name, f, preview, kind,
+      el('div', { class: 'dim', style: 'font-size:.8rem;line-height:1.6' }, 'Examples: ', el('span', { class: 'mono', text: '1d10! + @REF + @Handgun' }), ' · ', el('span', { class: 'mono', text: '1d10! + @INT + @{Awareness/Notice}' }), ' · ', el('span', { class: 'mono', text: '4d6 + @STR' }), ' · ', el('span', { class: 'mono', text: '1d10! + @COOL + @SA' }),
+        el('br'), 'Tokens: @REF/@INT/… (stats, wound penalties included), @SkillName or @{Skill Name}, @SA (special ability), @BTM, @STR (melee strength bonus). 1d10! explodes on a 10.')),
+      el('div', { class: 'row', style: 'margin-top:12px' },
+        isNew ? null : el('button', { class: 'danger', text: 'Delete', onclick: () => { sh.macros = sh.macros.filter(x => x.id !== macro.id); saveSheetNow(sh); closeModal(); if (done) done(); } }),
+        el('div', { class: 'grow' }),
+        el('button', { class: 'primary', text: 'Save', onclick: () => { try { N.roll(resolveFormula(sh, f.value)); } catch (e) { toast(e.message || 'Not a valid roll', true); return; } macro.name = name.value.trim() || 'Roll'; macro.formula = f.value; macro.kind = kind.value; sh.macros = sh.macros || []; if (isNew) sh.macros.push(macro); saveSheetNow(sh); closeModal(); if (done) done(); } })));
+    setTimeout(() => name.focus(), 0);
+  }
+  function runMacro(sh, mc) { rollWithMods(sh, mc.formula, sh.name + ': ' + mc.name, mc.kind); }
+
+  // macro bar above the chat box: pick one of your characters, click its macros, flip its toggles
+  let macroChipsOpen = false;
+  function renderMacroBar() {
+    const bar = $('#macrobar'); if (!bar) return; bar.textContent = '';
+    if (!S) return;
+    const mine = Object.values(S.sheets).filter(x => canEditSheet(x));
+    if (!mine.length) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    const key = 'nct-active-sheet-' + S.id; let cur = S.sheets[LS.get(key, '')]; if (!cur || !canEditSheet(cur)) cur = mine[0];
+    const sel = el('select', { style: 'max-width:140px;font-size:.8rem;padding:2px 4px', onchange: e => { LS.set(key, e.target.value); renderMacroBar(); } }, ...mine.map(x => el('option', { value: x.id, text: x.name, selected: x.id === cur.id })));
+    const sh = N.clone(cur);
+    const macros = el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' }, ...(sh.macros || []).map(mc => el('button', { class: 'small primary', style: 'text-transform:none', title: mc.formula, text: '▶ ' + mc.name, onclick: () => runMacro(sh, mc), oncontextmenu: e => { e.preventDefault(); editMacroDialog(sh, mc, renderMacroBar); } })),
+      el('button', { class: 'small ghost', text: '+ Macro', title: 'Make a roll button', onclick: () => editMacroDialog(sh, null, renderMacroBar) }));
+    const on = (sh.mods || []).filter(m => m.on);
+    bar.append(...[el('div', { class: 'row', style: 'gap:6px' }, sel, macros),
+      el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px;margin-top:4px' },
+        el('button', { class: 'small' + (macroChipsOpen ? ' primary' : ' ghost'), text: '⚙ Toggles' + (on.length ? ' (' + on.length + ' on)' : ''), onclick: () => { macroChipsOpen = !macroChipsOpen; renderMacroBar(); } }),
+        ...(macroChipsOpen ? [] : on.map(m => el('span', { class: 'badge b-vis', style: 'color:var(--p)', text: m.name + ' ' + modValue(sh, m) })))),
+      macroChipsOpen ? el('div', { style: 'margin-top:4px' }, modChips(sh, true, () => { saveSheetNow(sh); setTimeout(renderMacroBar, 30); }), el('button', { class: 'small ghost', style: 'margin-top:4px', text: 'Edit toggles…', onclick: () => editModsDialog(sh, renderMacroBar) })) : null].filter(Boolean));
+  }
+
+  // damage calculator: SP of the hit location, head ×2, BTM, armor wear, then onto the wound track
+  function applyDamageDialog(msg) {
+    const targets = Object.values(S.sheets).filter(x => canEditSheet(x));
+    if (!targets.length) return toast('There are no characters you can apply damage to', true);
+    const m = modal('Apply damage: ' + msg.roll.total);
+    const dmg = el('input', { type: 'number', value: msg.roll.total, style: 'width:80px' });
+    const tgt = el('select', { class: 'grow' }, ...targets.map(x => el('option', { value: x.id, text: x.name + ' (' + N.woundInfo(x.damage).label + ')' })));
+    const loc = el('select', null, el('option', { value: 'roll', text: 'Roll hit location' }), ...N.LOCS.map(([k, l]) => el('option', { value: k, text: l })));
+    const ap = el('input', { type: 'checkbox', checked: !!msg.ap }), wear = el('input', { type: 'checkbox', checked: true }), cover = el('input', { type: 'number', value: 0, style: 'width:60px' });
+    const calc = el('div', { class: 'mono', style: 'background:var(--field);border:1px solid var(--line);padding:10px;margin:10px 0;line-height:1.7;white-space:pre-wrap' });
+    let rolledLoc = null;
+    const compute = () => {
+      const sh = S.sheets[tgt.value]; if (!sh) return null;
+      let l = loc.value; if (l === 'roll') { if (!rolledLoc) { const r = Math.floor(Math.random() * 10) + 1; rolledLoc = r === 1 ? 'head' : r <= 4 ? 'torso' : r === 5 ? 'rArm' : r === 6 ? 'lArm' : r <= 8 ? 'rLeg' : 'lLeg'; } l = rolledLoc; }
+      const lname = N.LOCS.find(x => x[0] === l)[1];
+      let sp = (Number(sh.sp[l]) || 0) + (Number(cover.value) || 0); if (ap.checked) sp = Math.floor(sp / 2);
+      const d = Math.max(0, Number(dmg.value) || 0); let through = Math.max(0, d - sp);
+      const lines = ['Damage rolled        ' + d, 'Hit location         ' + lname + (loc.value === 'roll' ? ' (rolled)' : ''), '− Armor SP           ' + sp + (ap.checked ? ' (AP: half)' : '') + (Number(cover.value) ? ' incl. cover ' + cover.value : '')];
+      if (through > 0 && l === 'head') { through *= 2; lines.push('× 2 head hit         ' + through); }
+      const btm = N.derived(sh).btm; let final = through > 0 ? Math.max(1, through + btm) : 0;
+      lines.push('− Body type (BTM ' + btm + ')'); lines.push('= Wounds taken        ' + final);
+      const after = Math.min(41, sh.damage + final); lines.push('Wound track          ' + sh.damage + ' → ' + after + ' (' + N.woundInfo(after).label + ')');
+      if (final > 0 && wear.checked && (Number(sh.sp[l]) || 0) > 0) lines.push('Armor at ' + lname + ' wears down: SP ' + sh.sp[l] + ' → ' + (sh.sp[l] - 1));
+      if (final > 0 && final >= 8 && l === 'head') lines.push('⚠ 8+ to the head: the target is killed outright (CP2020 rule).');
+      if (final > 0 && final >= 8 && l !== 'head' && l !== 'torso') lines.push('⚠ 8+ to a limb: it is severed or crushed. Mortal 0, make a death save.');
+      calc.textContent = lines.join('\n');
+      return { sh, l, lname, final, after };
+    };
+    [dmg, tgt, loc, ap, wear, cover].forEach(x => x.addEventListener('input', () => { if (x === loc) rolledLoc = null; compute(); }));
+    m.append(el('div', { class: 'col' },
+      el('div', { class: 'row' }, el('label', { text: 'Damage' }), dmg, el('label', { text: 'Target' }), tgt),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Location' }), loc, el('label', { text: 'Cover SP' }), cover),
+      el('label', { class: 'row' }, ap, 'Armor-piercing (halves armor)'), el('label', { class: 'row' }, wear, 'Armor loses 1 SP when it is beaten')), calc,
+      el('div', { class: 'row' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Cancel', onclick: closeModal }),
+        el('button', { class: 'pink', text: 'Apply damage', onclick: () => {
+          const r = compute(); if (!r) return; const sh = N.clone(r.sh);
+          sh.damage = r.after; if (r.final > 0 && wear.checked && (Number(sh.sp[r.l]) || 0) > 0) sh.sp[r.l] -= 1;
+          request({ type: 'sheet.upsert', sheet: sh });
+          request({ type: 'chat', text: '💥 ' + sh.name + ' takes ' + r.final + ' wound' + (r.final === 1 ? '' : 's') + ' to the ' + r.lname + ' (' + N.woundInfo(r.after).label + ')' });
+          closeModal();
+        } })));
+    compute();
+  }
+
+  // ================= LIBRARY: your own rulebooks + quick reference =================
+  // Books are the person's own PDFs, stored only on their computer. Nothing from the books ships with the app.
+  const BOOK_LINES = { '2020': 'Cyberpunk 2020', red: 'Cyberpunk RED', other: 'Other / homebrew' };
+  let pdfLib = null;
+  function loadPdfLib() {
+    if (pdfLib) return Promise.resolve(pdfLib);
+    const tryLoad = (src, worker) => new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.onload = () => window.pdfjsLib ? res(worker) : rej(); sc.onerror = rej; document.head.appendChild(sc); });
+    return tryLoad('pdf.min.js', 'pdf.worker.min.js')
+      .catch(() => tryLoad('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js', 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'))
+      .then(worker => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = worker; pdfLib = window.pdfjsLib; return pdfLib; });
+  }
+  const bookList = () => LS.get('nct-books', []);
+  const saveBookList = l => LS.set('nct-books', l);
+  const openPdfs = new Map();
+  async function getPdf(id) {
+    if (openPdfs.has(id)) return openPdfs.get(id);
+    const rec = await DB.get(id, 'books'); if (!rec) throw new Error('That book is no longer on this computer');
+    const lib = await loadPdfLib();
+    const pdf = await lib.getDocument({ data: new Uint8Array(rec.data), isEvalSupported: false, disableFontFace: false }).promise;
+    openPdfs.set(id, pdf); return pdf;
+  }
+  async function bookText(id, onProgress) { // every page's text, worked out once and kept for searching
+    const cached = await DB.get(id, 'booktext').catch(() => null); if (cached) return cached.pages;
+    const pdf = await getPdf(id); const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const pg = await pdf.getPage(i); const tc = await pg.getTextContent();
+      pages.push(tc.items.map(x => x.str + (x.hasEOL ? '\n' : ' ')).join('').replace(/[ \t]+/g, ' '));
+      if (onProgress && i % 5 === 0) onProgress(i, pdf.numPages);
+    }
+    await DB.put({ id, pages }, 'booktext').catch(() => { });
+    return pages;
+  }
+  function addBookFiles(line) {
+    const inp = el('input', { type: 'file', accept: 'application/pdf,.pdf', multiple: true });
+    inp.onchange = async () => {
+      for (const f of inp.files) {
+        const id = N.uid(); toast('Adding ' + f.name + '…');
+        try { await DB.put({ id, data: await f.arrayBuffer() }, 'books'); }
+        catch (e) { toast('Not enough space on this computer for ' + f.name, true); continue; }
+        const l = bookList(); l.push({ id, name: f.name.replace(/\.pdf$/i, ''), line, size: f.size, added: Date.now() }); saveBookList(l);
+      }
+      renderBooks();
+    };
+    inp.click();
+  }
+  function renderBooks() {
+    const box = $('#booksPane'); if (!box) return; box.textContent = '';
+    const q = el('input', { class: 'grow', placeholder: 'Search all my books, e.g. autofire, stun save' });
+    const results = el('div', { class: 'col' });
+    const doSearch = async () => {
+      const term = q.value.trim().toLowerCase(); results.textContent = ''; if (term.length < 3) return;
+      const books = bookList(); if (!books.length) { results.append(el('div', { class: 'dim', text: 'Add a book first.' })); return; }
+      const status = el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Searching…' }); results.append(status);
+      let hits = 0;
+      for (const b of books) {
+        if (b.url) continue;
+        let pages; try { pages = await bookText(b.id, (i, n) => { status.textContent = 'Reading ' + b.name + ' for the first time… page ' + i + '/' + n; }); } catch (e) { continue; }
+        pages.forEach((t, i) => {
+          const at = t.toLowerCase().indexOf(term); if (at < 0 || hits >= 60) return; hits++;
+          const snip = (at > 60 ? '…' : '') + t.slice(Math.max(0, at - 60), at + term.length + 90).replace(/\s+/g, ' ') + '…';
+          results.append(el('div', { class: 'entry', style: 'flex-direction:column;align-items:flex-start', onclick: () => openReader(b.id, i + 1, term) },
+            el('div', { style: 'color:var(--p);font-weight:700;font-size:.8rem', text: b.name + ' · page ' + (i + 1) }), el('div', { class: 'dim', style: 'font-size:.8rem', text: snip })));
+        });
+      }
+      status.textContent = hits ? hits + (hits >= 60 ? '+' : '') + ' result' + (hits === 1 ? '' : 's') : 'Nothing found.';
+    };
+    q.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    box.append(el('div', { class: 'section-h', text: 'Rules quick reference' }),
+      el('div', { class: 'row' }, el('button', { class: 'primary grow', text: 'Cyberpunk 2020', onclick: () => openQuickRef('2020') }), el('button', { class: 'primary grow', text: 'Cyberpunk RED', onclick: () => openQuickRef('red') })),
+      el('div', { class: 'section-h', text: 'Search' }), el('div', { class: 'row' }, q, el('button', { text: 'Go', onclick: doSearch })), results,
+      el('div', { class: 'section-h', text: 'My books' }));
+    const books = bookList();
+    for (const [line, label] of Object.entries(BOOK_LINES)) {
+      const inLine = books.filter(b => b.line === line);
+      box.append(el('div', { class: 'folder' },
+        el('div', { class: 'fh' }, el('span', { class: 'grow', text: label }), el('span', { class: 'dim', text: String(inLine.length) }),
+          el('button', { class: 'small', text: '+ PDF', title: 'Add your own PDF copy of a ' + label + ' book', onclick: ev => { ev.stopPropagation(); addBookFiles(line); } }),
+          el('button', { class: 'small ghost', text: '+ Link', title: 'Add a link (opens in your web browser)', onclick: ev => { ev.stopPropagation(); askText('Link to the book (https://…)', '', u => { if (!/^https:\/\//.test(u)) return toast('Links must start with https://', true); askText('Name for this book', '', n => { const l = bookList(); l.push({ id: N.uid(), name: n || u, line, url: u, added: Date.now() }); saveBookList(l); renderBooks(); }); }); } })),
+        el('div', { class: 'fb' }, ...(inLine.length ? inLine.map(b => el('div', { class: 'entry', onclick: () => b.url ? window.open(b.url, '_blank', 'noopener') : openReader(b.id, 1) },
+          el('span', { text: b.url ? '🔗' : '📕' }), el('span', { class: 'nm', text: b.name }), b.size ? el('span', { class: 'dim', style: 'font-size:.72rem', text: Math.round(b.size / 1048576) + ' MB' }) : null,
+          el('button', { class: 'small ghost', text: '✎', onclick: ev => { ev.stopPropagation(); askText('Rename book', b.name, n => { const l = bookList(); const x = l.find(y => y.id === b.id); if (x) x.name = n; saveBookList(l); renderBooks(); }); } }),
+          el('button', { class: 'small ghost danger', text: '✕', onclick: ev => { ev.stopPropagation(); askConfirm('Remove "' + b.name + '"?', 'It is removed from this computer only.', 'Remove', () => { saveBookList(bookList().filter(x => x.id !== b.id)); DB.del(b.id, 'books').catch(() => { }); DB.del(b.id, 'booktext').catch(() => { }); openPdfs.delete(b.id); renderBooks(); }); } })))
+          : [el('div', { class: 'dim', style: 'font-size:.8rem', text: 'No books yet.' })]))));
+    }
+    box.append(el('p', { class: 'dim', style: 'font-size:.78rem', text: 'Your books stay on this computer. Each player adds their own copies. The quick reference is a short summary in our own words. Your rulebook and your DM have the final say.' }));
+  }
+  async function openReader(id, page, highlight) {
+    const meta = bookList().find(b => b.id === id); if (!meta) return;
+    const m = modal(meta.name, true); m.style.width = 'min(1400px,100%)';
+    const toc = el('div', { style: 'width:280px;flex:none;max-height:78vh;overflow:auto;border-right:1px solid var(--line);padding-right:8px;font-size:.85rem' }, el('div', { class: 'dim', text: 'Loading…' }));
+    const canvas = el('canvas', { style: 'max-width:100%;border:1px solid var(--line);background:#fff' });
+    const pnum = el('input', { type: 'number', min: 1, style: 'width:70px' }); const total = el('span', { class: 'dim' });
+    let pdf, cur = page || 1, zoom = LS.get('nct-reader-zoom', 1.4), rendering = null;
+    const view = el('div', { style: 'flex:1;min-width:0;max-height:78vh;overflow:auto;text-align:center' }, canvas);
+    const go = async n => {
+      if (!pdf) return; cur = Math.max(1, Math.min(pdf.numPages, n)); pnum.value = cur;
+      const pg = await pdf.getPage(cur); const vp = pg.getViewport({ scale: zoom * (window.devicePixelRatio || 1) });
+      canvas.width = vp.width; canvas.height = vp.height; canvas.style.width = (vp.width / (window.devicePixelRatio || 1)) + 'px';
+      if (rendering) { try { rendering.cancel(); } catch (e) { } }
+      rendering = pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp }); try { await rendering.promise; } catch (e) { } view.scrollTop = 0;
+    };
+    const findIn = el('input', { class: 'grow', placeholder: 'Search this book', value: highlight || '' });
+    const findRes = el('div', { class: 'col', style: 'gap:2px;margin:6px 0' });
+    const doFind = async () => {
+      const term = findIn.value.trim().toLowerCase(); findRes.textContent = ''; if (term.length < 3) return;
+      findRes.append(el('div', { class: 'dim', text: 'Searching…' }));
+      const pages = await bookText(id, (i, n) => { findRes.firstChild.textContent = 'Reading page ' + i + '/' + n + '…'; }); findRes.textContent = '';
+      let n = 0; pages.forEach((t, i) => { if (n < 80 && t.toLowerCase().includes(term)) { n++; findRes.append(el('button', { class: 'small ghost', style: 'text-align:left;text-transform:none', text: 'p.' + (i + 1) + ' ' + t.slice(Math.max(0, t.toLowerCase().indexOf(term) - 20), t.toLowerCase().indexOf(term) + 40).replace(/\s+/g, ' '), onclick: () => go(i + 1) })); } });
+      if (!n) findRes.append(el('div', { class: 'dim', text: 'Not found' }));
+    };
+    findIn.addEventListener('keydown', e => { if (e.key === 'Enter') doFind(); });
+    m.append(el('div', { class: 'row', style: 'flex-wrap:wrap;margin-bottom:8px' },
+      el('button', { text: '◀', onclick: () => go(cur - 1) }), el('span', { text: 'Page' }), pnum, el('span', null, '/ ', total), el('button', { text: '▶', onclick: () => go(cur + 1) }),
+      el('button', { class: 'small', text: '−', onclick: () => { zoom = Math.max(0.5, zoom - 0.2); LS.set('nct-reader-zoom', zoom); go(cur); } }), el('button', { class: 'small', text: '+', onclick: () => { zoom = Math.min(4, zoom + 0.2); LS.set('nct-reader-zoom', zoom); go(cur); } }),
+      el('div', { class: 'grow' }), findIn, el('button', { text: 'Find', onclick: doFind })),
+      el('div', { class: 'row', style: 'align-items:flex-start;gap:12px' }, el('div', { class: 'col', style: 'width:280px;flex:none;gap:0' }, findRes, toc), view));
+    toc.previousSibling;
+    pnum.onchange = () => go(Number(pnum.value));
+    try { pdf = await getPdf(id); } catch (e) { toc.textContent = e.message || 'Could not open this PDF'; return; }
+    total.textContent = String(pdf.numPages);
+    go(cur); if (highlight) doFind();
+    // the book's own table of contents, sorted into chapters
+    toc.textContent = '';
+    const outline = await pdf.getOutline().catch(() => null);
+    if (!outline || !outline.length) { toc.append(el('div', { class: 'dim', text: "This PDF has no chapter list. Use search instead." })); return; }
+    const pageOf = async dest => { try { const d = typeof dest === 'string' ? await pdf.getDestination(dest) : dest; return d ? (await pdf.getPageIndex(d[0])) + 1 : null; } catch (e) { return null; } };
+    const draw = (items, depth, into) => { for (const it of items) {
+      const b = el('div', { class: 'entry', style: 'padding:3px 6px;margin-left:' + (depth * 12) + 'px;border:0', text: it.title, onclick: async () => { const pg = await pageOf(it.dest); if (pg) go(pg); } });
+      into.append(b); if (it.items && it.items.length && depth < 3) draw(it.items, depth + 1, into); } };
+    toc.append(el('div', { class: 'section-h', text: 'Chapters' })); draw(outline, 0, toc);
+  }
+  // short rules summaries, written for this app (not copied from the books)
+  const QUICK_REF = {
+    '2020': [
+      ['Skill checks', ['Roll 1d10 + STAT + SKILL. Beat the difficulty: Easy 10 · Average 15 · Difficult 20 · Very Difficult 25 · Nearly Impossible 30.', 'A natural 10 explodes: roll again and add it. A natural 1 is a fumble, and the DM decides what goes wrong.', 'Contested checks: both sides roll and the higher total wins.']],
+      ['Turn order', ['Initiative: 1d10 + REF (Solos add Combat Sense). Highest goes first.', 'A turn is about 3 seconds: move, plus one action. Each extra action in a turn is −3.']],
+      ['Ranged attacks', ['Roll 1d10 + REF + weapon skill + weapon accuracy (WA) against the range difficulty:', 'Point blank 10 · Close (up to ¼ range) 15 · Medium (½ range) 20 · Long (full range) 25 · Extreme (up to 2× range) 30.', 'Common modifiers: aiming +1 per turn (max +3), ambush +5, target not moving +4, running −3, fast draw −3, called shot −4, off hand −3.', 'Three-round burst: +3 at close and medium range. If it hits, half of 1d6 rounds hit (round up).', 'Full auto: each point you beat the difficulty by is one more bullet hitting (up to the rounds fired). Close range gets +1 per 10 rounds; longer ranges −1 per 10.']],
+      ['Melee', ['Attacker: 1d10 + REF + melee skill. Defender: 1d10 + REF + Dodge & Escape (or their melee skill). Higher wins.', 'Strength damage bonus by BODY: 2 → −2 · 3-4 → −1 · 5-7 → 0 · 8-9 → +1 · 10 → +2 · 11-12 → +4 · 13-14 → +6 · 15+ → +8.']],
+      ['Hit location (1d10)', ['1 Head · 2-4 Torso · 5 Right arm · 6 Left arm · 7-8 Right leg · 9-10 Left leg.']],
+      ['Damage, step by step', ['1. Roll weapon damage.', '2. Subtract the armor SP at the hit location.', '3. Head hit: double what got through.', '4. Subtract the Body Type Modifier (BTM). If anything got past the armor, at least 1 point still lands.', '5. Mark it on the wound track. Armor that was beaten loses 1 SP.', '8+ points to a limb after armor: the limb is severed or crushed (Mortal 0). 8+ to the head kills outright.']],
+      ['Wounds', ['4 boxes per level. Light (1-4): no penalty. Serious (5-8): REF −2. Critical (9-12): REF, INT and COOL halved.', 'Mortal 0-6 (13-40): REF, INT and COOL ÷3, and you make a death save every turn. 41+: dead.']],
+      ['Saves', ['Stun/Shock save (whenever you take damage): roll 1d10, you need BODY or less. Subtract the wound penalty first: Serious −1, Critical −2, Mortal 0 −3, and so on. Fail and you are out of the fight.', 'Death save (when mortally wounded, every turn): 1d10, you need BODY minus your Mortal level or less. Fail and you die.']],
+      ['Body type', ['BTM by BODY: 2 → 0 · 3-4 → −1 · 5-7 → −2 · 8-9 → −3 · 10 → −4 · 11+ → −5.', 'Run = MA × 3 metres per turn. Leap = Run ÷ 4. Lift = BODY × 40 kg.']],
+      ['Humanity & cyberware', ['Humanity = EMP × 10. Every implant costs Humanity Loss (HL).', 'For every full 10 points of Humanity lost, EMP drops by 1. At EMP 0 the character is a cyberpsycho and becomes the DM\'s.']]
+    ],
+    red: [
+      ['Skill checks', ['Roll 1d10 + STAT + SKILL against a Difficulty Value (DV): Simple 9 · Everyday 13 · Difficult 15 · Professional 17 · Heroic 21 · Incredible 24 · Legendary 29.', 'A natural 10: roll again and add it. A natural 1: roll again and subtract it.', 'Contested checks: both sides roll and the higher total wins. Ties go to the defender.']],
+      ['Turn order', ['Initiative: 1d10 + REF.', 'On your turn: one Move Action (up to MOVE × 2 metres) and one Action.']],
+      ['Ranged attacks', ['Roll 1d10 + REF + weapon skill against the DV from your weapon type\'s range table (core rulebook).', 'A target with REF 8 or more can choose to dodge with DEX + Evasion instead of using the DV.', 'Aimed shot: −8 to hit. On the head, damage that gets through armor is doubled.']],
+      ['Melee', ['Attacker: 1d10 + DEX + melee skill. Defender: 1d10 + DEX + Evasion.']],
+      ['Damage', ['Roll the weapon\'s dice and subtract the SP of the head or body armor. What gets through comes off Hit Points.', 'Armor that is beaten loses 1 SP (ablation).', 'Two or more 6s on the damage dice is a Critical Injury: 5 extra damage that ignores armor, plus an injury from the table.']],
+      ['Weapon damage by type', ['Medium pistol 2d6 · Heavy pistol 3d6 · Very heavy pistol 4d6 · SMG 2d6 · Heavy SMG 3d6.', 'Shotgun 5d6 · Assault rifle 5d6 · Sniper rifle 5d6 · Bow or crossbow 4d6 · Grenade launcher 6d6 · Rocket launcher 8d6.', 'Melee: light 1d6 · medium 2d6 · heavy 3d6 · very heavy 4d6.']],
+      ['Armor (SP)', ['Leathers 4 · Kevlar 7 · Light armorjack 11 · Bodyweight suit 11 · Medium armorjack 12 · Heavy armorjack 13 · Flak 15 · Metalgear 18.']],
+      ['Hit Points & wounds', ['HP = 10 + 5 × (BODY + WILL ÷ 2, rounded up).', 'Seriously Wounded (under half HP): −2 to all actions.', 'Mortally Wounded (under 1 HP): −4 to all actions and a death save every turn. Roll 1d10 and you must get under your BODY. Each save makes the next one harder.']],
+      ['Humanity & cyberware', ['Humanity = EMP × 10. Installing cyberware costs Humanity Loss.', 'EMP drops 1 for every full 10 Humanity lost. Run out and you are a cyberpsycho.']]
+    ]
+  };
+  function openQuickRef(line) {
+    const m = modal((line === 'red' ? 'Cyberpunk RED' : 'Cyberpunk 2020') + ': rules quick reference', true);
+    const q = el('input', { class: 'grow', placeholder: 'Filter, e.g. head, autofire, death' });
+    const body = el('div', { class: 'col', style: 'gap:12px' });
+    const draw = () => { body.textContent = ''; const t = q.value.trim().toLowerCase();
+      for (const [title, lines] of QUICK_REF[line]) { const ls = t ? lines.filter(x => (title + ' ' + x).toLowerCase().includes(t)) : lines; if (!ls.length) continue;
+        body.append(el('div', { class: 'box', style: 'border:1px solid var(--line);padding:10px' }, el('div', { class: 'section-h', style: 'margin:0 0 6px', text: title }), ...ls.map(x => el('div', { style: 'margin:3px 0;line-height:1.45', text: x })))); }
+      if (!body.children.length) body.append(el('div', { class: 'dim', text: 'Nothing matches.' })); };
+    q.oninput = draw; draw();
+    m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q, el('button', { class: 'small', text: line === 'red' ? 'Switch to 2020' : 'Switch to RED', onclick: () => openQuickRef(line === 'red' ? '2020' : 'red') })), body,
+      el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary written for Night City Table. For full rules, open your rulebook in the Books tab. Your DM\'s ruling always wins.' }));
   }
 
   // ================= INSTALL AS AN APP =================
