@@ -41,4 +41,4 @@ When a new version is out, the app shows an **Update available** banner on its h
 
 ## For whoever changes the game
 
-The game is the web page in `app/`. The Windows and Mac app is written in Rust (Tauri, in `src-tauri/`). The Linux app uses Electron (`main.js`). Every push to `main` builds new installers and publishes them as the latest release, and everyone's app then offers the update.
+The game's source code is in `source/` (see `source/README.md`). The built game page is in `app/`. The Windows and Mac app is written in Rust (Tauri, in `src-tauri/`). The Linux app uses Electron (`main.js`). Every push to `main` builds new installers and publishes them as the latest release, and everyone's app then offers the update.
