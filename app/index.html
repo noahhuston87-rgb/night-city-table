@@ -129,6 +129,8 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:.08em;text-transform
 #tabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));border-bottom:1px solid var(--line)}
 #tabs button{border:1px solid transparent;border-radius:0;background:transparent;padding:9px 2px;font-family:var(--display);font-size:.7rem;letter-spacing:.04em;color:var(--dim);white-space:nowrap}
 #tabs button::before{content:'◆ ';color:var(--s)}
+.mobonly{display:none}
+#canvas{touch-action:none}
 #tabs button.on{color:var(--p);border:2px solid var(--p);background:color-mix(in srgb,var(--p) 12%,transparent);box-shadow:inset 0 0 12px color-mix(in srgb,var(--p) 20%,transparent)}
 #tabs button.on::before{color:var(--p)}
 .pane{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -322,6 +324,71 @@ table.wt input{width:100%;padding:2px 4px}
   #people{display:none}
 }
 
+/* ============ PHONES (and small tablets) ============ */
+@media (max-width:760px){
+  html{font-size:min(var(--fs,16px),16px)}
+  #table{display:flex;flex-direction:column;height:100%;height:100dvh}
+  #topbar{flex:0 0 auto;height:48px;gap:6px;padding:0 8px;padding-top:env(safe-area-inset-top)}
+  #topbar .title{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
+  #topbar .status #netText{display:none}
+  #backupBtn{display:none!important}
+  #inviteBtn{font-size:0;padding:6px 10px}
+  #inviteBtn::after{content:'INVITE';font-size:.72rem}
+  #topbar button{min-width:40px;min-height:36px}
+  #tools{order:1;flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:6px;padding:6px 8px;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
+  #tools > div{width:8px;height:auto!important}
+  #tools button{width:44px;height:40px;flex:none}
+  #stage{order:2;flex:1;min-height:0}
+  #splitter{display:none}
+  #side{order:3;flex:0 0 auto;border-left:0;border-top:1px solid var(--line);min-height:0}
+  #tabs{order:2;display:flex;border-bottom:0;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);background:#000}
+  #tabs button{flex:1 1 0;min-width:0;min-height:56px;padding:4px 0 3px;font-size:.56rem;letter-spacing:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden;text-overflow:ellipsis}
+  #tabs button.gmonly.hidden,#tabs button.hidden{display:none}
+  #tabs button::before{font-size:1.25rem;line-height:1;color:inherit;filter:saturate(.8)}
+  #tabs button[data-tab=map]::before{content:'🗺'} #tabs button[data-tab=chat]::before{content:'💬'} #tabs button[data-tab=sheets]::before{content:'👤'}
+  #tabs button[data-tab=journal]::before{content:'📓'} #tabs button[data-tab=init]::before{content:'⚔'} #tabs button[data-tab=books]::before{content:'📚'}
+  #tabs button[data-tab=maps]::before{content:'🖼'} #tabs button[data-tab=audio]::before{content:'🎵'}
+  #tabs button.on{border:0;border-top:3px solid var(--p);box-shadow:none}
+  .mobonly{display:block}
+  .pane{order:1}
+  /* map tab: map fills the screen, the side shows only the tab bar */
+  body.mtab-map #side .pane{display:none!important}
+  /* any other tab: the panel fills the screen */
+  body:not(.mtab-map) #stage, body:not(.mtab-map) #tools{display:none}
+  body:not(.mtab-map) #side{flex:1}
+  #people{display:none}
+  #zoomctl button{min-width:44px;min-height:40px;font-size:1.1rem}
+  #tokenhud{left:6px;right:6px;top:6px;max-width:none}
+  /* bigger tap targets everywhere */
+  button{min-height:38px}
+  button.small{min-height:34px}
+  #quickdice{flex-wrap:wrap}
+  #quickdice button{min-height:36px;padding:4px 10px}
+  .ammo .ab button{min-height:34px;padding:4px 9px;font-size:.8rem}
+  /* iPhone zooms into any text box under 16px, so keep them at 16px */
+  input,select,textarea{font-size:16px!important}
+  /* pop-ups fill the screen */
+  .overlay{padding:0;align-items:stretch}
+  .modal,.modal.wide{width:100%;min-height:100%;border-left:0;border-right:0;padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
+  .modal h2{font-size:1rem;padding-right:44px}
+  .modal .x{min-width:44px;min-height:40px}
+  .sheet{grid-template-columns:1fr}.sheet .full{grid-column:1}
+  .sheettabs button{min-width:0;flex:1 0 30%;font-size:.7rem;padding:10px 4px}
+  .modal .row{flex-wrap:wrap}
+  table{display:block;overflow-x:auto}
+  #ctx{left:0!important;right:0;top:auto!important;bottom:0;width:auto;max-height:70vh;overflow:auto;border-width:2px 0 0;padding-bottom:env(safe-area-inset-bottom);z-index:60}
+  #ctx button{padding:12px 14px;font-size:.95rem}
+  #toast{bottom:calc(70px + env(safe-area-inset-bottom));width:92%}
+  .installbar{flex-wrap:wrap}
+}
+
+#streamplayer{position:fixed;left:12px;bottom:12px;z-index:45;background:#000;border:2px solid var(--p);box-shadow:0 0 calc(14px*var(--gl)) var(--glow);width:284px}
+#streamplayer .sp-head{display:flex;align-items:center;gap:6px;padding:2px 2px 2px 8px;font-size:.75rem;text-transform:uppercase;color:var(--p);white-space:nowrap;overflow:hidden}
+#streamplayer .sp-head .grow{overflow:hidden;text-overflow:ellipsis}
+#streamplayer #spSlot iframe{display:block;border:0;width:280px}
+#streamplayer.min{left:-10000px;top:0;bottom:auto} /* moved off screen, still playing */
+@media (max-width:760px){ #streamplayer{left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom))} #streamplayer.min{left:-10000px;transform:none} }
+
 </style>
 </head>
 <body>
@@ -412,6 +479,7 @@ table.wt input{width:100%;padding:2px 4px}
   <div id="splitter" title="Drag to resize"></div>
   <div id="side">
     <div id="tabs">
+      <button data-tab="map" class="mobonly">MAP</button>
       <button data-tab="chat" class="on">CHAT</button>
       <button data-tab="sheets">SHEETS</button>
       <button data-tab="journal">JOURNAL</button>
@@ -790,6 +858,7 @@ function nctSiteHelper() {
   // older saves don't have the newer sections
   function upgrade(state) {
     if (!state.init) state.init = { list: [], turn: 0 };
+    if (typeof state.allowWeb !== 'boolean') state.allowWeb = false; // the DM must switch on web-browser joining
     if (!state.init.moved) state.init.moved = {};
     if (!state.init.rules) state.init.rules = { limit: true, turnOnly: false };
     if (!state.init.round) state.init.round = 1;
@@ -822,6 +891,7 @@ function nctSiteHelper() {
       case 'sheet.upsert': state.sheets[op.sheet.id] = op.sheet; break;
       case 'sheet.delete': delete state.sheets[op.id]; for (const mid in state.maps) for (const tid in state.maps[mid].tokens) if (state.maps[mid].tokens[tid].sheetId === op.id) state.maps[mid].tokens[tid].sheetId = null; break;
       case 'init.set': state.init = op.init; break;
+      case 'web.allow': state.allowWeb = !!op.on; break;
       case 'journal.folder.upsert': upgrade(state); state.journal.folders[op.folder.id] = op.folder; break;
       case 'journal.folder.delete': upgrade(state); delete state.journal.folders[op.id]; for (const id in state.journal.entries) if (state.journal.entries[id].folderId === op.id) state.journal.entries[id].folderId = null; break;
       case 'journal.entry.upsert': upgrade(state); state.journal.entries[op.entry.id] = op.entry; break;
@@ -1159,6 +1229,7 @@ function nctSiteHelper() {
         if (!isGM && s.ownerId !== sender.id) return deny();
         out.ops.push({ type: 'sheet.delete', id: req.id }); return out;
       }
+      case 'web.allow': { if (!isGM) return deny('Only the DM can change this'); out.ops.push({ type: 'web.allow', on: !!req.on }); return out; }
       case 'init.set': {
         if (!isGM) return deny();
         upgrade(state);
@@ -1397,6 +1468,7 @@ window.peerReady = new Promise(function (resolve) {
   const DESKTOP = !!window.nctDesktop; // running inside the installed desktop app
   const ONLINE = !DESKTOP && /^https?:$/.test(location.protocol);
   const APP_URL = ONLINE ? location.origin + location.pathname : '';
+  const WEB_URL = 'https://noahhuston87-rgb.github.io/night-city-table/'; // the online copy anyone can open in a browser
   const PEER_PREFIX = 'nctable-v1-';
 
   // ---------- IndexedDB (games are stored on the DM's computer) ----------
@@ -1479,7 +1551,8 @@ window.peerReady = new Promise(function (resolve) {
       const pid = String(d.id || '').slice(0, 40);
       if (!pid) return;
       if (pid === S.gmId) { conn.send({ t: 'err', fatal: true, msg: "You're the DM of this game. Open it from the home screen under 'Your games' instead." }); setTimeout(() => conn.close(), 500); return; }
-      conn.pid = pid; net.conns.set(conn.peer, conn);
+      if (d.web && !S.allowWeb) { conn.send({ t: 'err', fatal: true, msg: "The DM hasn't switched on web browser joining for this game. Ask them to turn it on (Invite players → Allow web browser players), or join with the Night City Table app." }); setTimeout(() => conn.close(), 500); return; }
+      conn.pid = pid; conn.web = !!d.web; net.conns.set(conn.peer, conn);
       hostCommit(N.handleRequest(S, { type: 'player.upsert', name: d.name, color: d.color }, { id: pid }));
       conn.send({ t: 'welcome', you: pid, state: N.viewFor(S, pid), hostNow: Date.now() });
       broadcastPresence(); updateHostStatus();
@@ -1555,7 +1628,7 @@ window.peerReady = new Promise(function (resolve) {
     const conn = net.peer.connect(PEER_PREFIX + joinCode, { reliable: true });
     net.conn = conn;
     const t = setTimeout(() => { if (!conn.open && net.conn === conn) { setNet('off', "DM isn't online, waiting…"); scheduleRejoin(); } }, 9000);
-    conn.on('open', () => { clearTimeout(t); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color }); });
+    conn.on('open', () => { clearTimeout(t); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color, web: !DESKTOP }); });
     conn.on('data', clientRecv);
     conn.on('close', () => { if (net.conn !== conn || net.closing) return; setNet('warn', 'Lost the DM, reconnecting…'); scheduleRejoin(); });
   }
@@ -1653,7 +1726,7 @@ window.peerReady = new Promise(function (resolve) {
   function showTable() {
     $('#home').classList.add('hidden'); $('#importscreen').classList.add('hidden'); $('#table').classList.remove('hidden');
     $('#chatlog').textContent = ''; renderedMsgs.clear();
-    selectTab('chat');
+    selectTab('chat'); if (isPhone()) selectTab('map');
     resizeCanvas(); fitView(true); renderAll(true);
     if (role === 'host') checkPendingImport();
   }
@@ -1705,17 +1778,27 @@ window.peerReady = new Promise(function (resolve) {
     if (DESKTOP) {
       const dl = window.nctDesktop.downloadUrl;
       const msg = 'Join my Cyberpunk game on Night City Table!\nGame code: ' + S.id + (dl ? '\nGet the app (free): ' + dl : '') + '\nOpen the app, type your name, paste the code under "Join a game" and press Join.';
-      m.append(el('p', { text: 'Players need the Night City Table app too. Copy this message and send it to them (Discord, text, anything):' }),
+      m.append(el('p', { text: 'For players with the Night City Table app, copy this message and send it to them (Discord, text, anything). For players without it, use the web link below.' }),
         el('textarea', { readonly: true, style: 'width:100%;height:110px', value: msg }),
         el('div', { class: 'row', style: 'margin:6px 0 12px' }, el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Copy message', onclick: () => copyText(msg) })),
         el('div', { style: 'text-align:center;font-family:var(--display);font-size:42px;letter-spacing:.2em;color:var(--cyan);text-shadow:0 0 14px var(--cyan)', text: S.id }));
-    } else if (link) {
-      const inp = el('input', { value: link, readonly: true, class: 'grow mono', onclick: e => e.target.select() });
-      m.append(el('p', { text: 'Send this link to your players (Discord, text, anything). They open it, type a name, and join.' }),
-        el('div', { class: 'row' }, inp, el('button', { class: 'primary', text: 'Copy', onclick: () => copyText(link) })));
-    } else {
+    } else if (!ONLINE) {
       m.append(el('p', { class: 'notice', text: "This copy is running from a file on your computer, so there's no link to share yet. Put it online first (see 'How does this work?' on the home screen). Until then players can't join over the internet." }));
     }
+    const webLink = (ONLINE ? APP_URL : WEB_URL) + '#join=' + S.id;
+    const webBox = el('div');
+    const drawWeb = () => {
+      webBox.textContent = '';
+      const sw = el('input', { type: 'checkbox', checked: !!S.allowWeb, onchange: e => {
+        hostCommit(N.handleRequest(S, { type: 'web.allow', on: e.target.checked }, { id: me.id, isGM: true }));
+        if (!e.target.checked) for (const c of net.conns.values()) if (c.web) { try { c.send({ t: 'err', fatal: true, msg: 'The DM switched off web browser joining. Use the Night City Table app to rejoin.' }); } catch (er) { } setTimeout(() => { try { c.close(); } catch (er) { } }, 400); }
+        saveNow(); drawWeb(); } });
+      webBox.append(el('div', { class: 'section-h', style: 'margin-top:16px', text: 'Web link (no install)' }),
+        el('label', { class: 'row', style: 'gap:8px' }, sw, el('b', { text: 'Allow web browser players' })),
+        el('p', { class: 'dim', style: 'font-size:13px', text: S.allowWeb ? 'On: anyone with this link can join from Chrome, Edge, Safari or a phone. Switch it off and web players are disconnected.' : 'Off: players must use the app. Switch on to let people join from a web browser with a link.' }));
+      if (S.allowWeb) webBox.append(el('div', { class: 'row' }, el('input', { value: webLink, readonly: true, class: 'grow mono', onclick: e => e.target.select() }), el('button', { class: 'primary', text: 'Copy link', onclick: () => copyText(webLink) })));
+    };
+    if (role === 'host') { drawWeb(); m.append(webBox); }
     m.append(el('p', { class: 'dim' }, 'Game code: ', el('b', { class: 'mono', text: S.id }), '. Players can also type this code on the home screen. Keep this tab open while you play. If you close it, players wait until you open the game again.'));
   };
   function copyText(t) {
@@ -1737,7 +1820,10 @@ window.peerReady = new Promise(function (resolve) {
 
   // tabs
   let curTab = 'chat';
-  function selectTab(t) { curTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('hidden', p.id !== 'pane-' + t)); renderPane(); }
+  const isPhone = () => window.matchMedia('(max-width:760px)').matches;
+  function selectTab(t) {
+    if (t === 'map') { document.body.classList.add('mtab-map'); $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === 'map')); requestAnimationFrame(resizeCanvas); return; }
+    document.body.classList.remove('mtab-map'); curTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('hidden', p.id !== 'pane-' + t)); renderPane(); }
   $$('#tabs button').forEach(b => b.onclick = () => selectTab(b.dataset.tab));
   function renderPane() { if (!S) return; const pn = $('#pane-' + curTab); if (pn && pn.contains(document.activeElement) && document.activeElement.matches('input,textarea,select')) return; if (curTab === 'sheets') renderSheets(); else if (curTab === 'init') renderInit(); else if (curTab === 'maps') renderMaps(); else if (curTab === 'journal') renderJournal(); else if (curTab === 'audio') renderAudio(); else if (curTab === 'books') renderBooks(); }
 
@@ -1793,17 +1879,24 @@ window.peerReady = new Promise(function (resolve) {
     return im.complete && im.naturalWidth ? im : null;
   }
   function resizeCanvas() { const r = $('#stage').getBoundingClientRect(); DPR = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.max(1, W * DPR); cv.height = Math.max(1, H * DPR); draw(); }
-  window.addEventListener('resize', () => { if (!$('#table').classList.contains('hidden')) resizeCanvas(); });
+  window.addEventListener('resize', () => {
+    if (!isPhone() && document.body.classList.contains('mtab-map')) selectTab(curTab);
+    if (!$('#table').classList.contains('hidden')) resizeCanvas();
+  });
   function view() { const m = activeMap(); if (!m) return { x: 0, y: 0, z: 1 }; if (!views[m.id]) views[m.id] = fitFor(m); return views[m.id]; }
   function fitFor(m) { const z = Math.min((W || 800) / m.w, (H || 600) / m.h) * 0.95 || 1; return { z, x: ((W || 800) - m.w * z) / 2, y: ((H || 600) - m.h * z) / 2 }; }
   function fitView(force) { const m = activeMap(); if (!m) return; if (force || !views[m.id]) views[m.id] = fitFor(m); draw(); }
   const toWorld = (sx, sy) => { const v = view(); return { x: (sx - v.x) / v.z, y: (sy - v.y) / v.z }; };
   function tokenPx(t, m) { return t.size * m.grid.size; }
   function visibleTokens(m) { return Object.values(m.tokens).filter(t => !t.hidden || isGM()); }
+  let touchSlop = 0; // extra screen pixels around tokens for fingers
   function hitToken(wx, wy) {
     const m = activeMap(); if (!m) return null; const list = visibleTokens(m);
     for (let i = list.length - 1; i >= 0; i--) { const t = list[i]; const p = tokenPx(t, m); const cx = t.x + p / 2, cy = t.y + p / 2; if ((wx - cx) ** 2 + (wy - cy) ** 2 <= (p / 2) ** 2) return t; }
-    return null;
+    if (!touchSlop) return null;
+    const reach = touchSlop / view().z; let best = null, bd = Infinity;
+    for (const t of list) { const p = tokenPx(t, m); const d = Math.hypot(wx - (t.x + p / 2), wy - (t.y + p / 2)) - p / 2; if (d < reach && d < bd) { bd = d; best = t; } }
+    return best;
   }
   function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -1921,10 +2014,24 @@ window.peerReady = new Promise(function (resolve) {
 
   // pointer handling
   let ctxDown = null;
+  // touch: two fingers pinch-zoom and pan, a long press on a token opens its menu
+  const touches = new Map(); let pinch = null, longPress = null;
+  const pinchInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+  function cancelLongPress() { if (longPress) { clearTimeout(longPress.timer); longPress = null; } }
   cv.addEventListener('pointerdown', e => {
+    touchSlop = e.pointerType === 'touch' ? 22 : 0;
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (touches.size === 2) { cancelLongPress(); drag = null; pan = null; if (ruler) ruler.active = false; pinch = pinchInfo(); try { cv.setPointerCapture(e.pointerId); } catch (er) { } draw(); return; }
+      if (touches.size > 2 || pinch) return;
+    }
     closeCtx(); if (!S) return; const m = activeMap(); if (!m) return;
-    cv.setPointerCapture(e.pointerId);
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { }
     const w = toWorld(e.offsetX, e.offsetY);
+    if (e.pointerType === 'touch' && tool === 'move') {
+      const lt = hitToken(w.x, w.y);
+      if (lt) { const cx = e.clientX, cy = e.clientY, sx = e.offsetX, sy = e.offsetY; longPress = { sx, sy, timer: setTimeout(() => { longPress = null; drag = null; draw(); if (navigator.vibrate) navigator.vibrate(15); openCtx(lt, cx, cy); }, 550) }; }
+    }
     if (e.button === 1 || e.button === 2) { pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: e.button }; if (e.button === 2) ctxDown = { x: e.clientX, y: e.clientY, w }; return; }
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
@@ -1941,13 +2048,30 @@ window.peerReady = new Promise(function (resolve) {
     selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw(); renderTokenHud();
   });
   cv.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pinch && touches.size === 2) {
+        const p = pinchInfo(), v = view(); const nz = Math.max(0.05, Math.min(8, v.z * p.d / pinch.d));
+        v.x = p.x - (pinch.x - v.x) * (nz / v.z); v.y = p.y - (pinch.y - v.y) * (nz / v.z); v.z = nz; pinch = p; draw(); return;
+      }
+      if (pinch) return;
+      if (longPress && Math.hypot(e.offsetX - longPress.sx, e.offsetY - longPress.sy) > 10) cancelLongPress();
+    }
     if (pan) { const v = view(); const dx = e.offsetX - pan.sx, dy = e.offsetY - pan.sy; if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true; v.x += dx; v.y += dy; pan.sx = e.offsetX; pan.sy = e.offsetY; draw(); return; }
     const w = toWorld(e.offsetX, e.offsetY);
     if (drag) { drag.x = w.x - drag.dx; drag.y = w.y - drag.dy; draw(); return; }
     if (ruler && ruler.active) { ruler.x2 = w.x; ruler.y2 = w.y; draw(); }
     const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' || tool === 'target' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
   });
+  const touchEnd = e => {
+    if (e.pointerType !== 'touch') return false;
+    touches.delete(e.pointerId);
+    if (pinch) { if (!touches.size) pinch = null; return true; }
+    return false;
+  };
+  cv.addEventListener('pointercancel', e => { cancelLongPress(); touchEnd(e); drag = null; pan = null; draw(); });
   cv.addEventListener('pointerup', e => {
+    cancelLongPress(); if (touchEnd(e)) return;
     const m = activeMap();
     if (pan) { const wasRight = pan.button === 2 && !pan.moved; pan = null; if (wasRight && ctxDown) { const t = hitToken(ctxDown.w.x, ctxDown.w.y); if (t) openCtx(t, ctxDown.x, ctxDown.y); } ctxDown = null; return; }
     if (drag && m) {
@@ -2073,6 +2197,7 @@ window.peerReady = new Promise(function (resolve) {
     box.append(el('p', { class: 'dim', style: 'font-size:14px', text: 'Tips: drag tokens to move them (they snap to the grid). Right-click a token for options, double-click to open its sheet. Hidden tokens are only visible to you. Drag empty space to pan, scroll to zoom.' }));
   }
   function placeToken(t) {
+    if (isPhone()) setTimeout(() => selectTab('map'), 50);
     const m = activeMap(); if (!m) return toast('Show a map first', true);
     const w = toWorld(W / 2, H / 2); const p = (t.size || 1) * m.grid.size;
     const g = m.grid.size;
@@ -2544,11 +2669,78 @@ window.peerReady = new Promise(function (resolve) {
     const u = dataToBlobUrl(data); srcCache.set(track.id, u); return u;
   }
   function tryPlay(a) { const p = a.play(); if (p && p.catch) p.catch(() => { audioBlocked = true; renderNowPlaying(); }); }
+  // ---- YouTube and Spotify links: played through their own embedded players ----
+  function streamKind(u) {
+    u = String(u || '');
+    let x = u.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|embed\/|shorts\/|live\/)|youtu\.be\/|music\.youtube\.com\/watch\?[^#]*v=)([\w-]{11})/);
+    const list = (u.match(/[?&]list=([\w-]+)/) || [])[1];
+    if (x || (list && /youtube\.com/.test(u))) return { type: 'youtube', id: x ? x[1] : null, list: list || null };
+    x = u.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/) || u.match(/^spotify:(track|album|playlist|episode|show|artist):([A-Za-z0-9]+)/);
+    if (x) return { type: 'spotify', kind: x[1], id: x[2], uri: 'spotify:' + x[1] + ':' + x[2] };
+    return null;
+  }
+  const stream = { key: '', type: '', yt: null, sp: null, box: null, min: LS.get('nct-player-min', false) };
+  function loadScriptOnce(src, readyName) {
+    window.__nctScripts = window.__nctScripts || {};
+    if (!window.__nctScripts[src]) window.__nctScripts[src] = new Promise(res => { const prev = window[readyName]; window[readyName] = function (a) { if (prev) try { prev(a); } catch (e) { } res(a); }; const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.onerror = () => res(null); document.head.appendChild(sc); });
+    return window.__nctScripts[src];
+  }
+  function streamBox() {
+    if (stream.box) return stream.box;
+    const b = el('div', { id: 'streamplayer', class: stream.min ? 'min' : '' },
+      el('div', { class: 'sp-head' }, el('span', { class: 'grow', id: 'spTitle', text: '♪' }), el('button', { class: 'small ghost', text: '–', title: 'Hide the player (music keeps playing)', onclick: () => { stream.min = true; LS.set('nct-player-min', true); b.classList.add('min'); renderNowPlaying(); } })),
+      el('div', { id: 'spSlot' }));
+    document.body.appendChild(b); stream.box = b; return b;
+  }
+  function showStreamPlayer() { stream.min = false; LS.set('nct-player-min', false); if (stream.box) stream.box.classList.remove('min'); renderNowPlaying(); }
+  function stopStream() {
+    try { stream.yt && stream.yt.destroy(); } catch (e) { } try { stream.sp && stream.sp.destroy(); } catch (e) { }
+    stream.yt = stream.sp = null; stream.key = ''; stream.type = '';
+    if (stream.box) { stream.box.remove(); stream.box = null; }
+  }
+  function streamVolume(m) { return vol.mute ? 0 : Math.round(Math.max(0, Math.min(1, (m.volume ?? 0.6) * vol.music)) * 100); }
+  function streamPos(m) { return Math.max(0, (m.offset || 0) + (Date.now() + clockSkew - m.startedAt) / 1000); }
+  function watchBlocked(check) { setTimeout(() => { if (!check()) { audioBlocked = true; renderNowPlaying(); } }, 3500); }
+  async function playStream(m, sk) {
+    const key = m.track.id + '@' + m.startedAt;
+    if (stream.key === key) { if (stream.yt && stream.yt.setVolume) { stream.yt.setVolume(streamVolume(m)); vol.mute ? stream.yt.mute() : stream.yt.unMute(); } return; }
+    stopStream(); musicEl.pause(); stream.key = key; stream.type = sk.type;
+    const b = streamBox(); $('#spTitle', b).textContent = '♪ ' + m.track.name;
+    const slot = el('div'); $('#spSlot', b).append(slot);
+    if (sk.type === 'youtube') {
+      const YT = await loadScriptOnce('https://www.youtube.com/iframe_api', 'onYouTubeIframeAPIReady').then(() => window.YT);
+      if (!YT || !YT.Player || stream.key !== key) { if (!YT) renderNowPlaying("Couldn't reach YouTube"); return; }
+      const vars = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin.startsWith('http') ? location.origin : undefined };
+      if (sk.list) { vars.listType = 'playlist'; vars.list = sk.list; vars.loop = 1; }
+      stream.yt = new YT.Player(slot, { width: 280, height: 158, videoId: sk.id || undefined, playerVars: vars, events: {
+        onReady: e => { const p = e.target; p.setVolume(streamVolume(m)); if (vol.mute) p.mute(); const d = p.getDuration() || 0; let t = streamPos(m); if (m.loop && d > 0) t = t % d; if (t > 1) p.seekTo(t, true); p.playVideo(); watchBlocked(() => p.getPlayerState && p.getPlayerState() === 1); },
+        onStateChange: e => { if (e.data === 0 && m.loop && sk.id && !sk.list) { e.target.seekTo(0, true); e.target.playVideo(); } if (e.data === 1 && audioBlocked) { audioBlocked = false; renderNowPlaying(); } },
+        onError: () => renderNowPlaying("YouTube won't play this one here (the owner may block embedding)") } });
+    } else {
+      const API = await loadScriptOnce('https://open.spotify.com/embed/iframe-api/v1', 'onSpotifyIframeApiReady');
+      if (!API || stream.key !== key) { if (!API) renderNowPlaying("Couldn't reach Spotify"); return; }
+      let playing = false;
+      API.createController(slot, { uri: sk.uri, width: 280, height: sk.kind === 'track' || sk.kind === 'episode' ? 80 : 152 }, c => {
+        if (stream.key !== key) { try { c.destroy(); } catch (e) { } return; }
+        stream.sp = c;
+        c.addListener('playback_update', e => { const d = e.data || {}; if (d.isPaused === false) { playing = true; if (audioBlocked) { audioBlocked = false; renderNowPlaying(); } } if (m.loop && d.duration && d.position >= d.duration - 400 && !d.isPaused) { c.seek(0); } });
+        c.addListener('ready', () => { c.play(); const t = streamPos(m); if (t > 2 && (sk.kind === 'track' || sk.kind === 'episode')) setTimeout(() => { try { c.seek(t); } catch (e) { } }, 800); watchBlocked(() => playing); });
+      });
+    }
+    renderNowPlaying();
+  }
+  function resumeStream() {
+    if (stream.yt && stream.yt.playVideo) stream.yt.playVideo();
+    if (stream.sp) { try { stream.sp.resume ? stream.sp.resume() : stream.sp.play(); } catch (e) { } showStreamPlayer(); }
+  }
   async function applyMusic() {
     if (!S || !S.audio) return;
     const m = S.audio.music;
     musicEl.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (m.volume ?? 0.6) * vol.music));
-    if (!m.playing || !m.track) { musicEl.pause(); renderNowPlaying(); return; }
+    if (!m.playing || !m.track) { musicEl.pause(); stopStream(); renderNowPlaying(); return; }
+    const sk = streamKind(m.track.url);
+    if (sk) { await playStream(m, sk); return; }
+    stopStream();
     const src = await trackSrc(m.track);
     if (!src) { renderNowPlaying("Couldn't load " + m.track.name); return; }
     if (S.audio.music !== m) return; // changed while loading
@@ -2564,13 +2756,14 @@ window.peerReady = new Promise(function (resolve) {
     const src = await trackSrc(track); if (!src) return;
     const a = new Audio(src); a.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (v ?? 1) * vol.sfx)); tryPlay(a);
   }
-  function stopAllAudio() { musicEl.pause(); musicEl.removeAttribute('src'); musicEl.dataset.key = ''; renderNowPlaying(); }
+  function stopAllAudio() { stopStream(); musicEl.pause(); musicEl.removeAttribute('src'); musicEl.dataset.key = ''; renderNowPlaying(); }
   function renderNowPlaying(msg) {
     const box = $('#nowplaying'); box.textContent = '';
     const m = S && S.audio && S.audio.music;
-    if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Click to turn on sound', onclick: () => { audioBlocked = false; tryPlay(musicEl); renderNowPlaying(); } })); return; }
+    if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Tap to turn on sound', onclick: () => { audioBlocked = false; if (stream.type) resumeStream(); else tryPlay(musicEl); renderNowPlaying(); } })); return; }
     if (!m || !m.playing || !m.track) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden'); box.append('♪ ' + (msg || m.track.name));
+    if (stream.type && stream.min) box.append(el('button', { class: 'small ghost', text: 'Show player', onclick: showStreamPlayer }));
   }
   $('#audioBtn').onclick = e => {
     const old = $('.popover'); if (old) { old.remove(); return; }
@@ -2610,14 +2803,18 @@ window.peerReady = new Promise(function (resolve) {
     const tracks = Object.values(S.audio.tracks); const m = S.audio.music;
     const music = tracks.filter(t => t.kind === 'music'), sounds = tracks.filter(t => t.kind === 'sound');
     const nm = el('input', { class: 'grow', placeholder: 'Name, e.g. Afterlife bar' }), url = el('input', { class: 'grow', placeholder: 'Link to an audio file (https://…mp3)' });
-    const addLink = kind => { const u = fixAudioLink(url.value); if (/youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast('That link is a web page, not an audio file. Use a direct link to an .mp3 (a Dropbox or Google Drive share link works) or upload the file.', true); return; } request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
+    const addLink = kind => { let u = fixAudioLink(url.value); const sk = streamKind(u);
+      if (sk && kind === 'sound') { toast('YouTube and Spotify links work for music. For sound effects, upload a file or use a direct .mp3 link.', true); return; }
+      if (!sk && /youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast("That link isn't a song, video or playlist. Copy the link from the Share button.", true); return; }
+      if (sk && sk.type === 'spotify') u = 'https://open.spotify.com/' + sk.kind + '/' + sk.id;
+      if (sk && !nm.value.trim()) nm.value = sk.type === 'youtube' ? (sk.list && !sk.id ? 'YouTube playlist' : 'YouTube video') : 'Spotify ' + sk.kind; request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
     box.append(el('div', { class: 'section-h', text: 'Music (plays for everyone, loops)' }),
       el('div', { class: 'col' }, nm, url, el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '+ Add music link', onclick: () => addLink('music') }), el('button', { class: 'grow', text: '⬆ Upload music', onclick: () => addAudioFiles('music') }))),
       el('div', { class: 'setrow' }, el('span', { text: 'Music volume for everyone' }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: m.volume ?? 0.6, onchange: e => request({ type: 'music.volume', volume: Number(e.target.value) }) })));
     if (m.playing && m.track) box.append(el('div', { class: 'row' }, el('span', { class: 'grow', text: '♪ Now playing: ' + m.track.name }), el('button', { class: 'danger', text: '■ Stop', onclick: () => request({ type: 'music.stop' }) })));
-    if (!music.length) box.append(el('div', { class: 'dim', text: 'No music yet. Paste a link to an mp3 (Dropbox and Google Drive share links work) or upload files.' }));
+    box.append(el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Links can be YouTube videos or playlists, Spotify songs, albums or playlists, or an mp3 (Dropbox and Google Drive share links work). Spotify plays whole songs only for people logged in to Spotify; everyone else hears 30-second previews.' }));
     for (const t of music) box.append(el('div', { class: 'track' + (m.playing && m.track && m.track.id === t.id ? ' playing' : '') },
-      el('span', { class: 'nm', text: (t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
+      el('span', { class: 'nm', text: (streamKind(t.url) ? (streamKind(t.url).type === 'youtube' ? '▶️ ' : '🟢 ') : t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
       el('button', { class: 'small primary', text: '▶', title: 'Play for everyone', onclick: () => request({ type: 'music.play', id: t.id, loop: true }) }),
       el('button', { class: 'small ghost', text: '✎', title: 'Rename', onclick: () => askText('Rename', t.name, n => request({ type: 'audio.track.rename', id: t.id, name: n })) }),
       el('button', { class: 'small ghost danger', text: '✕', onclick: () => askConfirm('Delete "' + t.name + '"?', '', 'Delete', () => { request({ type: 'audio.track.delete', id: t.id }); if (t.file) DB.del(t.id, 'audio').catch(() => { }); }) })));
@@ -3215,6 +3412,7 @@ window.peerReady = new Promise(function (resolve) {
     }
     if (!ONLINE || standalone() || LS.get('nct-installed', false)) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
+    if (window.matchMedia('(pointer:coarse)').matches) { $('#installBar b').textContent = 'Add to your home screen'; $('#installSub').textContent = 'Put Night City Table on your phone\'s home screen. It opens full screen, like an app.'; }
     $('#installBtn').textContent = installEvt ? 'Install app' : 'How to install';
   }
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; updateInstallBar(); });

@@ -178,6 +178,7 @@
   // older saves don't have the newer sections
   function upgrade(state) {
     if (!state.init) state.init = { list: [], turn: 0 };
+    if (typeof state.allowWeb !== 'boolean') state.allowWeb = false; // the DM must switch on web-browser joining
     if (!state.init.moved) state.init.moved = {};
     if (!state.init.rules) state.init.rules = { limit: true, turnOnly: false };
     if (!state.init.round) state.init.round = 1;
@@ -210,6 +211,7 @@
       case 'sheet.upsert': state.sheets[op.sheet.id] = op.sheet; break;
       case 'sheet.delete': delete state.sheets[op.id]; for (const mid in state.maps) for (const tid in state.maps[mid].tokens) if (state.maps[mid].tokens[tid].sheetId === op.id) state.maps[mid].tokens[tid].sheetId = null; break;
       case 'init.set': state.init = op.init; break;
+      case 'web.allow': state.allowWeb = !!op.on; break;
       case 'journal.folder.upsert': upgrade(state); state.journal.folders[op.folder.id] = op.folder; break;
       case 'journal.folder.delete': upgrade(state); delete state.journal.folders[op.id]; for (const id in state.journal.entries) if (state.journal.entries[id].folderId === op.id) state.journal.entries[id].folderId = null; break;
       case 'journal.entry.upsert': upgrade(state); state.journal.entries[op.entry.id] = op.entry; break;
@@ -547,6 +549,7 @@
         if (!isGM && s.ownerId !== sender.id) return deny();
         out.ops.push({ type: 'sheet.delete', id: req.id }); return out;
       }
+      case 'web.allow': { if (!isGM) return deny('Only the DM can change this'); out.ops.push({ type: 'web.allow', on: !!req.on }); return out; }
       case 'init.set': {
         if (!isGM) return deny();
         upgrade(state);

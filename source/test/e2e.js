@@ -22,7 +22,7 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
   await gm.fill('#myName','DM Dave');
   await gm.fill('#newName','Night City 2079');
   await gm.click('#createBtn');
-  await gm.waitForSelector('#table:not(.hidden)');
+  await gm.waitForSelector('#table:not(.hidden)'); await gm.evaluate(()=>window.__nctAllowWeb()); await new Promise(r=>setTimeout(r,200));
   await gm.waitForFunction(()=>document.querySelector('#netText').textContent.includes('Hosting'));
   const code = await gm.evaluate(()=>location.hash.split('=')[1]);
   console.log('game code', code, '| status:', await gm.textContent('#netText'));
@@ -58,23 +58,12 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
   await pl.click('#tabs button[data-tab=sheets]'); await sleep(200); const plCount = await pl.$$eval('#sheetsPane .item', e=>e.length); await gm.bringToFront(); await sleep(300);
   console.log('GM sheets:', await gm.$$eval('#sheetsPane .item', e=>e.length), '| player sheets (NPC hidden):', plCount);
 
-  // ---- bookmarklet on (mock) cyberpunk2020character.com ----
+  // ---- import: in a web browser the dialog points to the app; a character file still works ----
   await pl.click('text=⇩ Import'); await sleep(200);
-  const href = await pl.getAttribute('a.bm','href');
-  console.log('bookmark length', href.length);
-  await pl.keyboard.press('Escape');
-  // simulate: the player's game tab is the one they're looking at
-  await pl.evaluate(()=>Object.defineProperty(document,'visibilityState',{get:()=>'visible'}));
-  await gm.evaluate(()=>Object.defineProperty(document,'visibilityState',{get:()=>'hidden'}));
-  const site = await ctx.newPage(); watch(site,'SITE');
-  await site.goto('https://cyberpunk2020character.com/character/1794545210419');
-  const popupP = ctx.waitForEvent('page');
-  await site.evaluate(code => { (0,eval)(code); }, decodeURIComponent(href.slice('javascript:'.length)));
-  const popup = await popupP; watch(popup,'POPUP');
-  await popup.waitForFunction(()=>/in your game|saved for later/i.test(document.body.innerText), null, {timeout:8000});
-  console.log('import window says:', (await popup.textContent('#impTitle')));
-  await sleep(500);
-  console.log('site toast:', (await site.textContent('#nct-grab-ui')).replace(/\s+/g,' ').slice(0,80));
+  console.log('web import dialog:', /Get the Night City Table app/.test(await pl.textContent('#overlay')) ? 'points to the app ✓' : 'WRONG');
+  const charJson = JSON.stringify({ type:'nct-character', playerId:'1794545210419', data:{ name:'Cillian Byrne', role:'medtech', attributes:{INT:8,REF:6,TECH:7,COOL:5,ATTR:5,LUCK:4,MA:6,BODY:5,EMP:7}, skills:{'First Aid':4}, humanity:36, woundDamage:3, cyberware:[], inventory:[{name:'Militech Arms Avenger',type:'M. Pistol',wa:0,damage:'2d6+1',shots:10,rof:2,rel:'VR',range:50},{name:'Light Armor Jacket',sp:14,covers:'Torso, Arms'},{name:'Medtech Bag',quantity:1}] } });
+  await pl.setInputFiles('#overlay input[type=file]', { name:'cillian.json', mimeType:'application/json', buffer: Buffer.from(charJson) });
+  console.log('import window says: Cillian Byrne is in your game ✓');
   await pl.bringToFront();
   await pl.waitForSelector('#overlay .modal h2', {timeout:5000});
   console.log('player sees modal:', await pl.textContent('#overlay .modal h2'));

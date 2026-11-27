@@ -4,7 +4,7 @@ await ctx.route('**/*',r=>r.request().url().startsWith('http://localhost')?r.con
 await ctx.addInitScript(fs.readFileSync('test/fakepeer.js','utf8'));
 const errs=[];
 const gm=await ctx.newPage(); gm.on('pageerror',e=>errs.push('GM '+e.message));
-await gm.goto('http://localhost:8123/'); await gm.fill('#myName','DM'); await gm.click('#createBtn'); await gm.waitForSelector('#table:not(.hidden)');
+await gm.goto('http://localhost:8123/'); await gm.fill('#myName','DM'); await gm.click('#createBtn'); await gm.waitForSelector('#table:not(.hidden)'); await gm.evaluate(()=>window.__nctAllowWeb()); await new Promise(r=>setTimeout(r,200));
 await gm.click('#tabs button[data-tab=maps]'); await gm.click('text=+ Blank grid'); await sleep(200);
 const code=await gm.evaluate(()=>location.hash.split('=')[1]);
 const pl=await ctx.newPage(); pl.on('pageerror',e=>errs.push('PL '+e.message));

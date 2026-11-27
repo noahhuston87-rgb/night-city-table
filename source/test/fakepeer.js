@@ -20,3 +20,11 @@
     else if(m.kind==='close'){ const c=p.conns[m.cid]; if(c&&c.open){c.open=false;c.emit('close');} } };
   window.Peer=Peer;
 })();
+
+// test helper: the DM switches on "Allow web browser players" (test players join from a browser)
+window.__nctAllowWeb = function () {
+  document.querySelector('#inviteBtn').click();
+  const box = [...document.querySelectorAll('#overlay label')].find(l => /Allow web browser players/.test(l.textContent));
+  const cb = box && box.querySelector('input'); if (cb && !cb.checked) cb.click();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+};

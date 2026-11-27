@@ -31,6 +31,7 @@
   const DESKTOP = !!window.nctDesktop; // running inside the installed desktop app
   const ONLINE = !DESKTOP && /^https?:$/.test(location.protocol);
   const APP_URL = ONLINE ? location.origin + location.pathname : '';
+  const WEB_URL = 'https://noahhuston87-rgb.github.io/night-city-table/'; // the online copy anyone can open in a browser
   const PEER_PREFIX = 'nctable-v1-';
 
   // ---------- IndexedDB (games are stored on the DM's computer) ----------
@@ -113,7 +114,8 @@
       const pid = String(d.id || '').slice(0, 40);
       if (!pid) return;
       if (pid === S.gmId) { conn.send({ t: 'err', fatal: true, msg: "You're the DM of this game. Open it from the home screen under 'Your games' instead." }); setTimeout(() => conn.close(), 500); return; }
-      conn.pid = pid; net.conns.set(conn.peer, conn);
+      if (d.web && !S.allowWeb) { conn.send({ t: 'err', fatal: true, msg: "The DM hasn't switched on web browser joining for this game. Ask them to turn it on (Invite players → Allow web browser players), or join with the Night City Table app." }); setTimeout(() => conn.close(), 500); return; }
+      conn.pid = pid; conn.web = !!d.web; net.conns.set(conn.peer, conn);
       hostCommit(N.handleRequest(S, { type: 'player.upsert', name: d.name, color: d.color }, { id: pid }));
       conn.send({ t: 'welcome', you: pid, state: N.viewFor(S, pid), hostNow: Date.now() });
       broadcastPresence(); updateHostStatus();
@@ -189,7 +191,7 @@
     const conn = net.peer.connect(PEER_PREFIX + joinCode, { reliable: true });
     net.conn = conn;
     const t = setTimeout(() => { if (!conn.open && net.conn === conn) { setNet('off', "DM isn't online, waiting…"); scheduleRejoin(); } }, 9000);
-    conn.on('open', () => { clearTimeout(t); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color }); });
+    conn.on('open', () => { clearTimeout(t); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color, web: !DESKTOP }); });
     conn.on('data', clientRecv);
     conn.on('close', () => { if (net.conn !== conn || net.closing) return; setNet('warn', 'Lost the DM, reconnecting…'); scheduleRejoin(); });
   }
@@ -287,7 +289,7 @@
   function showTable() {
     $('#home').classList.add('hidden'); $('#importscreen').classList.add('hidden'); $('#table').classList.remove('hidden');
     $('#chatlog').textContent = ''; renderedMsgs.clear();
-    selectTab('chat');
+    selectTab('chat'); if (isPhone()) selectTab('map');
     resizeCanvas(); fitView(true); renderAll(true);
     if (role === 'host') checkPendingImport();
   }
@@ -339,17 +341,27 @@
     if (DESKTOP) {
       const dl = window.nctDesktop.downloadUrl;
       const msg = 'Join my Cyberpunk game on Night City Table!\nGame code: ' + S.id + (dl ? '\nGet the app (free): ' + dl : '') + '\nOpen the app, type your name, paste the code under "Join a game" and press Join.';
-      m.append(el('p', { text: 'Players need the Night City Table app too. Copy this message and send it to them (Discord, text, anything):' }),
+      m.append(el('p', { text: 'For players with the Night City Table app, copy this message and send it to them (Discord, text, anything). For players without it, use the web link below.' }),
         el('textarea', { readonly: true, style: 'width:100%;height:110px', value: msg }),
         el('div', { class: 'row', style: 'margin:6px 0 12px' }, el('div', { class: 'grow' }), el('button', { class: 'primary', text: 'Copy message', onclick: () => copyText(msg) })),
         el('div', { style: 'text-align:center;font-family:var(--display);font-size:42px;letter-spacing:.2em;color:var(--cyan);text-shadow:0 0 14px var(--cyan)', text: S.id }));
-    } else if (link) {
-      const inp = el('input', { value: link, readonly: true, class: 'grow mono', onclick: e => e.target.select() });
-      m.append(el('p', { text: 'Send this link to your players (Discord, text, anything). They open it, type a name, and join.' }),
-        el('div', { class: 'row' }, inp, el('button', { class: 'primary', text: 'Copy', onclick: () => copyText(link) })));
-    } else {
+    } else if (!ONLINE) {
       m.append(el('p', { class: 'notice', text: "This copy is running from a file on your computer, so there's no link to share yet. Put it online first (see 'How does this work?' on the home screen). Until then players can't join over the internet." }));
     }
+    const webLink = (ONLINE ? APP_URL : WEB_URL) + '#join=' + S.id;
+    const webBox = el('div');
+    const drawWeb = () => {
+      webBox.textContent = '';
+      const sw = el('input', { type: 'checkbox', checked: !!S.allowWeb, onchange: e => {
+        hostCommit(N.handleRequest(S, { type: 'web.allow', on: e.target.checked }, { id: me.id, isGM: true }));
+        if (!e.target.checked) for (const c of net.conns.values()) if (c.web) { try { c.send({ t: 'err', fatal: true, msg: 'The DM switched off web browser joining. Use the Night City Table app to rejoin.' }); } catch (er) { } setTimeout(() => { try { c.close(); } catch (er) { } }, 400); }
+        saveNow(); drawWeb(); } });
+      webBox.append(el('div', { class: 'section-h', style: 'margin-top:16px', text: 'Web link (no install)' }),
+        el('label', { class: 'row', style: 'gap:8px' }, sw, el('b', { text: 'Allow web browser players' })),
+        el('p', { class: 'dim', style: 'font-size:13px', text: S.allowWeb ? 'On: anyone with this link can join from Chrome, Edge, Safari or a phone. Switch it off and web players are disconnected.' : 'Off: players must use the app. Switch on to let people join from a web browser with a link.' }));
+      if (S.allowWeb) webBox.append(el('div', { class: 'row' }, el('input', { value: webLink, readonly: true, class: 'grow mono', onclick: e => e.target.select() }), el('button', { class: 'primary', text: 'Copy link', onclick: () => copyText(webLink) })));
+    };
+    if (role === 'host') { drawWeb(); m.append(webBox); }
     m.append(el('p', { class: 'dim' }, 'Game code: ', el('b', { class: 'mono', text: S.id }), '. Players can also type this code on the home screen. Keep this tab open while you play. If you close it, players wait until you open the game again.'));
   };
   function copyText(t) {
@@ -371,7 +383,10 @@
 
   // tabs
   let curTab = 'chat';
-  function selectTab(t) { curTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('hidden', p.id !== 'pane-' + t)); renderPane(); }
+  const isPhone = () => window.matchMedia('(max-width:760px)').matches;
+  function selectTab(t) {
+    if (t === 'map') { document.body.classList.add('mtab-map'); $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === 'map')); requestAnimationFrame(resizeCanvas); return; }
+    document.body.classList.remove('mtab-map'); curTab = t; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('hidden', p.id !== 'pane-' + t)); renderPane(); }
   $$('#tabs button').forEach(b => b.onclick = () => selectTab(b.dataset.tab));
   function renderPane() { if (!S) return; const pn = $('#pane-' + curTab); if (pn && pn.contains(document.activeElement) && document.activeElement.matches('input,textarea,select')) return; if (curTab === 'sheets') renderSheets(); else if (curTab === 'init') renderInit(); else if (curTab === 'maps') renderMaps(); else if (curTab === 'journal') renderJournal(); else if (curTab === 'audio') renderAudio(); else if (curTab === 'books') renderBooks(); }
 
@@ -427,17 +442,24 @@
     return im.complete && im.naturalWidth ? im : null;
   }
   function resizeCanvas() { const r = $('#stage').getBoundingClientRect(); DPR = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = Math.max(1, W * DPR); cv.height = Math.max(1, H * DPR); draw(); }
-  window.addEventListener('resize', () => { if (!$('#table').classList.contains('hidden')) resizeCanvas(); });
+  window.addEventListener('resize', () => {
+    if (!isPhone() && document.body.classList.contains('mtab-map')) selectTab(curTab);
+    if (!$('#table').classList.contains('hidden')) resizeCanvas();
+  });
   function view() { const m = activeMap(); if (!m) return { x: 0, y: 0, z: 1 }; if (!views[m.id]) views[m.id] = fitFor(m); return views[m.id]; }
   function fitFor(m) { const z = Math.min((W || 800) / m.w, (H || 600) / m.h) * 0.95 || 1; return { z, x: ((W || 800) - m.w * z) / 2, y: ((H || 600) - m.h * z) / 2 }; }
   function fitView(force) { const m = activeMap(); if (!m) return; if (force || !views[m.id]) views[m.id] = fitFor(m); draw(); }
   const toWorld = (sx, sy) => { const v = view(); return { x: (sx - v.x) / v.z, y: (sy - v.y) / v.z }; };
   function tokenPx(t, m) { return t.size * m.grid.size; }
   function visibleTokens(m) { return Object.values(m.tokens).filter(t => !t.hidden || isGM()); }
+  let touchSlop = 0; // extra screen pixels around tokens for fingers
   function hitToken(wx, wy) {
     const m = activeMap(); if (!m) return null; const list = visibleTokens(m);
     for (let i = list.length - 1; i >= 0; i--) { const t = list[i]; const p = tokenPx(t, m); const cx = t.x + p / 2, cy = t.y + p / 2; if ((wx - cx) ** 2 + (wy - cy) ** 2 <= (p / 2) ** 2) return t; }
-    return null;
+    if (!touchSlop) return null;
+    const reach = touchSlop / view().z; let best = null, bd = Infinity;
+    for (const t of list) { const p = tokenPx(t, m); const d = Math.hypot(wx - (t.x + p / 2), wy - (t.y + p / 2)) - p / 2; if (d < reach && d < bd) { bd = d; best = t; } }
+    return best;
   }
   function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
@@ -555,10 +577,24 @@
 
   // pointer handling
   let ctxDown = null;
+  // touch: two fingers pinch-zoom and pan, a long press on a token opens its menu
+  const touches = new Map(); let pinch = null, longPress = null;
+  const pinchInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+  function cancelLongPress() { if (longPress) { clearTimeout(longPress.timer); longPress = null; } }
   cv.addEventListener('pointerdown', e => {
+    touchSlop = e.pointerType === 'touch' ? 22 : 0;
+    if (e.pointerType === 'touch') {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (touches.size === 2) { cancelLongPress(); drag = null; pan = null; if (ruler) ruler.active = false; pinch = pinchInfo(); try { cv.setPointerCapture(e.pointerId); } catch (er) { } draw(); return; }
+      if (touches.size > 2 || pinch) return;
+    }
     closeCtx(); if (!S) return; const m = activeMap(); if (!m) return;
-    cv.setPointerCapture(e.pointerId);
+    try { cv.setPointerCapture(e.pointerId); } catch (er) { }
     const w = toWorld(e.offsetX, e.offsetY);
+    if (e.pointerType === 'touch' && tool === 'move') {
+      const lt = hitToken(w.x, w.y);
+      if (lt) { const cx = e.clientX, cy = e.clientY, sx = e.offsetX, sy = e.offsetY; longPress = { sx, sy, timer: setTimeout(() => { longPress = null; drag = null; draw(); if (navigator.vibrate) navigator.vibrate(15); openCtx(lt, cx, cy); }, 550) }; }
+    }
     if (e.button === 1 || e.button === 2) { pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: e.button }; if (e.button === 2) ctxDown = { x: e.clientX, y: e.clientY, w }; return; }
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
@@ -575,13 +611,30 @@
     selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw(); renderTokenHud();
   });
   cv.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+      touches.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+      if (pinch && touches.size === 2) {
+        const p = pinchInfo(), v = view(); const nz = Math.max(0.05, Math.min(8, v.z * p.d / pinch.d));
+        v.x = p.x - (pinch.x - v.x) * (nz / v.z); v.y = p.y - (pinch.y - v.y) * (nz / v.z); v.z = nz; pinch = p; draw(); return;
+      }
+      if (pinch) return;
+      if (longPress && Math.hypot(e.offsetX - longPress.sx, e.offsetY - longPress.sy) > 10) cancelLongPress();
+    }
     if (pan) { const v = view(); const dx = e.offsetX - pan.sx, dy = e.offsetY - pan.sy; if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true; v.x += dx; v.y += dy; pan.sx = e.offsetX; pan.sy = e.offsetY; draw(); return; }
     const w = toWorld(e.offsetX, e.offsetY);
     if (drag) { drag.x = w.x - drag.dx; drag.y = w.y - drag.dy; draw(); return; }
     if (ruler && ruler.active) { ruler.x2 = w.x; ruler.y2 = w.y; draw(); }
     const t = hitToken(w.x, w.y); cv.style.cursor = tool === 'ruler' || tool === 'target' ? 'crosshair' : tool === 'ping' ? 'cell' : t && canMoveToken(t) ? 'grab' : 'default';
   });
+  const touchEnd = e => {
+    if (e.pointerType !== 'touch') return false;
+    touches.delete(e.pointerId);
+    if (pinch) { if (!touches.size) pinch = null; return true; }
+    return false;
+  };
+  cv.addEventListener('pointercancel', e => { cancelLongPress(); touchEnd(e); drag = null; pan = null; draw(); });
   cv.addEventListener('pointerup', e => {
+    cancelLongPress(); if (touchEnd(e)) return;
     const m = activeMap();
     if (pan) { const wasRight = pan.button === 2 && !pan.moved; pan = null; if (wasRight && ctxDown) { const t = hitToken(ctxDown.w.x, ctxDown.w.y); if (t) openCtx(t, ctxDown.x, ctxDown.y); } ctxDown = null; return; }
     if (drag && m) {
@@ -707,6 +760,7 @@
     box.append(el('p', { class: 'dim', style: 'font-size:14px', text: 'Tips: drag tokens to move them (they snap to the grid). Right-click a token for options, double-click to open its sheet. Hidden tokens are only visible to you. Drag empty space to pan, scroll to zoom.' }));
   }
   function placeToken(t) {
+    if (isPhone()) setTimeout(() => selectTab('map'), 50);
     const m = activeMap(); if (!m) return toast('Show a map first', true);
     const w = toWorld(W / 2, H / 2); const p = (t.size || 1) * m.grid.size;
     const g = m.grid.size;
@@ -1075,6 +1129,7 @@
     }
     if (!ONLINE || standalone() || LS.get('nct-installed', false)) { bar.classList.add('hidden'); return; }
     bar.classList.remove('hidden');
+    if (window.matchMedia('(pointer:coarse)').matches) { $('#installBar b').textContent = 'Add to your home screen'; $('#installSub').textContent = 'Put Night City Table on your phone\'s home screen. It opens full screen, like an app.'; }
     $('#installBtn').textContent = installEvt ? 'Install app' : 'How to install';
   }
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; updateInstallBar(); });

@@ -115,11 +115,78 @@
     const u = dataToBlobUrl(data); srcCache.set(track.id, u); return u;
   }
   function tryPlay(a) { const p = a.play(); if (p && p.catch) p.catch(() => { audioBlocked = true; renderNowPlaying(); }); }
+  // ---- YouTube and Spotify links: played through their own embedded players ----
+  function streamKind(u) {
+    u = String(u || '');
+    let x = u.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|embed\/|shorts\/|live\/)|youtu\.be\/|music\.youtube\.com\/watch\?[^#]*v=)([\w-]{11})/);
+    const list = (u.match(/[?&]list=([\w-]+)/) || [])[1];
+    if (x || (list && /youtube\.com/.test(u))) return { type: 'youtube', id: x ? x[1] : null, list: list || null };
+    x = u.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/) || u.match(/^spotify:(track|album|playlist|episode|show|artist):([A-Za-z0-9]+)/);
+    if (x) return { type: 'spotify', kind: x[1], id: x[2], uri: 'spotify:' + x[1] + ':' + x[2] };
+    return null;
+  }
+  const stream = { key: '', type: '', yt: null, sp: null, box: null, min: LS.get('nct-player-min', false) };
+  function loadScriptOnce(src, readyName) {
+    window.__nctScripts = window.__nctScripts || {};
+    if (!window.__nctScripts[src]) window.__nctScripts[src] = new Promise(res => { const prev = window[readyName]; window[readyName] = function (a) { if (prev) try { prev(a); } catch (e) { } res(a); }; const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.onerror = () => res(null); document.head.appendChild(sc); });
+    return window.__nctScripts[src];
+  }
+  function streamBox() {
+    if (stream.box) return stream.box;
+    const b = el('div', { id: 'streamplayer', class: stream.min ? 'min' : '' },
+      el('div', { class: 'sp-head' }, el('span', { class: 'grow', id: 'spTitle', text: '♪' }), el('button', { class: 'small ghost', text: '–', title: 'Hide the player (music keeps playing)', onclick: () => { stream.min = true; LS.set('nct-player-min', true); b.classList.add('min'); renderNowPlaying(); } })),
+      el('div', { id: 'spSlot' }));
+    document.body.appendChild(b); stream.box = b; return b;
+  }
+  function showStreamPlayer() { stream.min = false; LS.set('nct-player-min', false); if (stream.box) stream.box.classList.remove('min'); renderNowPlaying(); }
+  function stopStream() {
+    try { stream.yt && stream.yt.destroy(); } catch (e) { } try { stream.sp && stream.sp.destroy(); } catch (e) { }
+    stream.yt = stream.sp = null; stream.key = ''; stream.type = '';
+    if (stream.box) { stream.box.remove(); stream.box = null; }
+  }
+  function streamVolume(m) { return vol.mute ? 0 : Math.round(Math.max(0, Math.min(1, (m.volume ?? 0.6) * vol.music)) * 100); }
+  function streamPos(m) { return Math.max(0, (m.offset || 0) + (Date.now() + clockSkew - m.startedAt) / 1000); }
+  function watchBlocked(check) { setTimeout(() => { if (!check()) { audioBlocked = true; renderNowPlaying(); } }, 3500); }
+  async function playStream(m, sk) {
+    const key = m.track.id + '@' + m.startedAt;
+    if (stream.key === key) { if (stream.yt && stream.yt.setVolume) { stream.yt.setVolume(streamVolume(m)); vol.mute ? stream.yt.mute() : stream.yt.unMute(); } return; }
+    stopStream(); musicEl.pause(); stream.key = key; stream.type = sk.type;
+    const b = streamBox(); $('#spTitle', b).textContent = '♪ ' + m.track.name;
+    const slot = el('div'); $('#spSlot', b).append(slot);
+    if (sk.type === 'youtube') {
+      const YT = await loadScriptOnce('https://www.youtube.com/iframe_api', 'onYouTubeIframeAPIReady').then(() => window.YT);
+      if (!YT || !YT.Player || stream.key !== key) { if (!YT) renderNowPlaying("Couldn't reach YouTube"); return; }
+      const vars = { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin.startsWith('http') ? location.origin : undefined };
+      if (sk.list) { vars.listType = 'playlist'; vars.list = sk.list; vars.loop = 1; }
+      stream.yt = new YT.Player(slot, { width: 280, height: 158, videoId: sk.id || undefined, playerVars: vars, events: {
+        onReady: e => { const p = e.target; p.setVolume(streamVolume(m)); if (vol.mute) p.mute(); const d = p.getDuration() || 0; let t = streamPos(m); if (m.loop && d > 0) t = t % d; if (t > 1) p.seekTo(t, true); p.playVideo(); watchBlocked(() => p.getPlayerState && p.getPlayerState() === 1); },
+        onStateChange: e => { if (e.data === 0 && m.loop && sk.id && !sk.list) { e.target.seekTo(0, true); e.target.playVideo(); } if (e.data === 1 && audioBlocked) { audioBlocked = false; renderNowPlaying(); } },
+        onError: () => renderNowPlaying("YouTube won't play this one here (the owner may block embedding)") } });
+    } else {
+      const API = await loadScriptOnce('https://open.spotify.com/embed/iframe-api/v1', 'onSpotifyIframeApiReady');
+      if (!API || stream.key !== key) { if (!API) renderNowPlaying("Couldn't reach Spotify"); return; }
+      let playing = false;
+      API.createController(slot, { uri: sk.uri, width: 280, height: sk.kind === 'track' || sk.kind === 'episode' ? 80 : 152 }, c => {
+        if (stream.key !== key) { try { c.destroy(); } catch (e) { } return; }
+        stream.sp = c;
+        c.addListener('playback_update', e => { const d = e.data || {}; if (d.isPaused === false) { playing = true; if (audioBlocked) { audioBlocked = false; renderNowPlaying(); } } if (m.loop && d.duration && d.position >= d.duration - 400 && !d.isPaused) { c.seek(0); } });
+        c.addListener('ready', () => { c.play(); const t = streamPos(m); if (t > 2 && (sk.kind === 'track' || sk.kind === 'episode')) setTimeout(() => { try { c.seek(t); } catch (e) { } }, 800); watchBlocked(() => playing); });
+      });
+    }
+    renderNowPlaying();
+  }
+  function resumeStream() {
+    if (stream.yt && stream.yt.playVideo) stream.yt.playVideo();
+    if (stream.sp) { try { stream.sp.resume ? stream.sp.resume() : stream.sp.play(); } catch (e) { } showStreamPlayer(); }
+  }
   async function applyMusic() {
     if (!S || !S.audio) return;
     const m = S.audio.music;
     musicEl.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (m.volume ?? 0.6) * vol.music));
-    if (!m.playing || !m.track) { musicEl.pause(); renderNowPlaying(); return; }
+    if (!m.playing || !m.track) { musicEl.pause(); stopStream(); renderNowPlaying(); return; }
+    const sk = streamKind(m.track.url);
+    if (sk) { await playStream(m, sk); return; }
+    stopStream();
     const src = await trackSrc(m.track);
     if (!src) { renderNowPlaying("Couldn't load " + m.track.name); return; }
     if (S.audio.music !== m) return; // changed while loading
@@ -135,13 +202,14 @@
     const src = await trackSrc(track); if (!src) return;
     const a = new Audio(src); a.volume = vol.mute ? 0 : Math.max(0, Math.min(1, (v ?? 1) * vol.sfx)); tryPlay(a);
   }
-  function stopAllAudio() { musicEl.pause(); musicEl.removeAttribute('src'); musicEl.dataset.key = ''; renderNowPlaying(); }
+  function stopAllAudio() { stopStream(); musicEl.pause(); musicEl.removeAttribute('src'); musicEl.dataset.key = ''; renderNowPlaying(); }
   function renderNowPlaying(msg) {
     const box = $('#nowplaying'); box.textContent = '';
     const m = S && S.audio && S.audio.music;
-    if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Click to turn on sound', onclick: () => { audioBlocked = false; tryPlay(musicEl); renderNowPlaying(); } })); return; }
+    if (audioBlocked && m && m.playing) { box.classList.remove('hidden'); box.append(el('button', { class: 'small primary', text: '🔊 Tap to turn on sound', onclick: () => { audioBlocked = false; if (stream.type) resumeStream(); else tryPlay(musicEl); renderNowPlaying(); } })); return; }
     if (!m || !m.playing || !m.track) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden'); box.append('♪ ' + (msg || m.track.name));
+    if (stream.type && stream.min) box.append(el('button', { class: 'small ghost', text: 'Show player', onclick: showStreamPlayer }));
   }
   $('#audioBtn').onclick = e => {
     const old = $('.popover'); if (old) { old.remove(); return; }
@@ -181,14 +249,18 @@
     const tracks = Object.values(S.audio.tracks); const m = S.audio.music;
     const music = tracks.filter(t => t.kind === 'music'), sounds = tracks.filter(t => t.kind === 'sound');
     const nm = el('input', { class: 'grow', placeholder: 'Name, e.g. Afterlife bar' }), url = el('input', { class: 'grow', placeholder: 'Link to an audio file (https://…mp3)' });
-    const addLink = kind => { const u = fixAudioLink(url.value); if (/youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast('That link is a web page, not an audio file. Use a direct link to an .mp3 (a Dropbox or Google Drive share link works) or upload the file.', true); return; } request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
+    const addLink = kind => { let u = fixAudioLink(url.value); const sk = streamKind(u);
+      if (sk && kind === 'sound') { toast('YouTube and Spotify links work for music. For sound effects, upload a file or use a direct .mp3 link.', true); return; }
+      if (!sk && /youtube\.com|youtu\.be|spotify\.com|soundcloud\.com/.test(u)) { toast("That link isn't a song, video or playlist. Copy the link from the Share button.", true); return; }
+      if (sk && sk.type === 'spotify') u = 'https://open.spotify.com/' + sk.kind + '/' + sk.id;
+      if (sk && !nm.value.trim()) nm.value = sk.type === 'youtube' ? (sk.list && !sk.id ? 'YouTube playlist' : 'YouTube video') : 'Spotify ' + sk.kind; request({ type: 'audio.track.add', track: { name: nm.value.trim() || u.split('/').pop().split('?')[0] || 'Track', kind, url: u } }); nm.value = ''; url.value = ''; };
     box.append(el('div', { class: 'section-h', text: 'Music (plays for everyone, loops)' }),
       el('div', { class: 'col' }, nm, url, el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '+ Add music link', onclick: () => addLink('music') }), el('button', { class: 'grow', text: '⬆ Upload music', onclick: () => addAudioFiles('music') }))),
       el('div', { class: 'setrow' }, el('span', { text: 'Music volume for everyone' }), el('input', { type: 'range', min: 0, max: 1, step: 0.05, value: m.volume ?? 0.6, onchange: e => request({ type: 'music.volume', volume: Number(e.target.value) }) })));
     if (m.playing && m.track) box.append(el('div', { class: 'row' }, el('span', { class: 'grow', text: '♪ Now playing: ' + m.track.name }), el('button', { class: 'danger', text: '■ Stop', onclick: () => request({ type: 'music.stop' }) })));
-    if (!music.length) box.append(el('div', { class: 'dim', text: 'No music yet. Paste a link to an mp3 (Dropbox and Google Drive share links work) or upload files.' }));
+    box.append(el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Links can be YouTube videos or playlists, Spotify songs, albums or playlists, or an mp3 (Dropbox and Google Drive share links work). Spotify plays whole songs only for people logged in to Spotify; everyone else hears 30-second previews.' }));
     for (const t of music) box.append(el('div', { class: 'track' + (m.playing && m.track && m.track.id === t.id ? ' playing' : '') },
-      el('span', { class: 'nm', text: (t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
+      el('span', { class: 'nm', text: (streamKind(t.url) ? (streamKind(t.url).type === 'youtube' ? '▶️ ' : '🟢 ') : t.url ? '🔗 ' : '♪ ') + t.name, title: t.url || 'uploaded file' }),
       el('button', { class: 'small primary', text: '▶', title: 'Play for everyone', onclick: () => request({ type: 'music.play', id: t.id, loop: true }) }),
       el('button', { class: 'small ghost', text: '✎', title: 'Rename', onclick: () => askText('Rename', t.name, n => request({ type: 'audio.track.rename', id: t.id, name: n })) }),
       el('button', { class: 'small ghost danger', text: '✕', onclick: () => askConfirm('Delete "' + t.name + '"?', '', 'Delete', () => { request({ type: 'audio.track.delete', id: t.id }); if (t.file) DB.del(t.id, 'audio').catch(() => { }); }) })));

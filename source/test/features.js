@@ -7,7 +7,7 @@ await ctx.addInitScript(fs.readFileSync('test/fakepeer.js','utf8'));
 const errs=[]; const w=(p,n)=>p.on('pageerror',e=>errs.push(n+': '+e.message));
 console.log('step: launched'); const gm=await ctx.newPage(); w(gm,'GM'); await gm.goto(APP); console.log('step: home loaded');
 await gm.screenshot({path:'test/f-home.png'});
-await gm.fill('#myName','DM Dave'); await gm.fill('#newName','Night City 2079'); await gm.click('#createBtn'); await gm.waitForSelector('#table:not(.hidden)');
+await gm.fill('#myName','DM Dave'); await gm.fill('#newName','Night City 2079'); await gm.click('#createBtn'); await gm.waitForSelector('#table:not(.hidden)'); await gm.evaluate(()=>window.__nctAllowWeb()); await new Promise(r=>setTimeout(r,200));
 console.log('step: hosting');
 const code=await gm.evaluate(()=>location.hash.split('=')[1]);
 const pl=await ctx.newPage(); w(pl,'PL');
