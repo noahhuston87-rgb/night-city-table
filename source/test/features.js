@@ -1,0 +1,84 @@
+const { chromium } = require('playwright'); const fs=require('fs');
+const APP='http://localhost:8123/'; const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{ const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required']});
+const ctx=await b.newContext({viewport:{width:1440,height:900}});
+await ctx.route('**/*',r=>r.request().url().startsWith('http://localhost')?r.continue():r.abort());
+await ctx.addInitScript(fs.readFileSync('test/fakepeer.js','utf8'));
+const errs=[]; const w=(p,n)=>p.on('pageerror',e=>errs.push(n+': '+e.message));
+console.log('step: launched'); const gm=await ctx.newPage(); w(gm,'GM'); await gm.goto(APP); console.log('step: home loaded');
+await gm.screenshot({path:'test/f-home.png'});
+await gm.fill('#myName','DM Dave'); await gm.fill('#newName','Night City 2079'); await gm.click('#createBtn'); await gm.waitForSelector('#table:not(.hidden)');
+console.log('step: hosting');
+const code=await gm.evaluate(()=>location.hash.split('=')[1]);
+const pl=await ctx.newPage(); w(pl,'PL');
+await pl.addInitScript(()=>{ if(!sessionStorage.getItem('x')){ sessionStorage.setItem('x','1'); localStorage.setItem('nct-id','"uPLAYER1"'); localStorage.setItem('nct-name','"Cillian"'); } });
+await pl.goto(APP+'#join='+code); await pl.waitForFunction(()=>document.querySelector('#netText').textContent==='Connected');
+console.log('step: player joined');
+await gm.bringToFront();
+// --- settings & theme sharing ---
+await gm.click('#settingsBtn'); await sleep(150); await gm.screenshot({path:'test/f-settings.png'});
+await gm.click('.tcard:has-text("ARASAKA CORP")'); await sleep(150);
+console.log('GM theme now:', await gm.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--p').trim()));
+await gm.click('text=Share theme with players'); await sleep(300); await gm.keyboard.press('Escape');
+await pl.bringToFront(); await sleep(200);
+console.log('player got DM theme:', await pl.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--p').trim()));
+await gm.bringToFront(); await gm.click('#settingsBtn'); await gm.click('.basicthemes button:has-text("TERMINAL GREEN")'); await gm.click('text=Share theme with players'); await gm.keyboard.press('Escape');
+// --- journal ---
+await gm.click('#tabs button[data-tab=journal]'); await sleep(100);
+await gm.click('#journalPane >> text=+ Folder'); await gm.fill('#overlay input','Clues'); await gm.keyboard.press('Enter'); await sleep(150);
+await gm.click('#journalPane >> text=+ New entry'); await gm.fill('#overlay input','The Fixer lies'); await gm.fill('#overlay textarea','Dex sold you out to Arasaka.');
+await gm.selectOption('#overlay select >> nth=1', {label:'Clues'}); await gm.click('#overlay >> text=Save'); await sleep(300);
+await gm.click('#journalPane >> text=+ New entry'); await gm.fill('#overlay input','Handout: Afterlife flyer'); await gm.fill('#overlay textarea','Rogue is hiring.');
+await gm.selectOption('#overlay select >> nth=0', 'all'); await gm.selectOption('#overlay select >> nth=1', {label:'Clues'}); await gm.click('#overlay >> text=Save'); await sleep(300);
+await pl.bringToFront(); await pl.click('#tabs button[data-tab=journal]'); await sleep(300);
+let pj=await pl.textContent('#journalPane'); console.log('player sees flyer:', /Afterlife flyer/.test(pj), '| player sees hidden clue:', /Fixer lies/.test(pj));
+await gm.bringToFront(); await gm.click('#journalPane >> text=Show all'); await sleep(300);
+await pl.bringToFront(); await sleep(300); pj=await pl.textContent('#journalPane'); console.log('after Show all, player sees clue:', /Fixer lies/.test(pj));
+await gm.bringToFront(); await gm.click('#journalPane >> text=Hide all'); await sleep(300);
+await pl.bringToFront(); await sleep(300); pj=await pl.textContent('#journalPane'); console.log('after Hide all, clue gone for player:', !/Fixer lies/.test(pj), '| folder gone:', !/Clues/i.test(pj));
+// player writes a note just for the DM
+await pl.click('#journalPane >> text=+ New entry'); await pl.fill('#overlay input','I think Dex is dirty'); await pl.fill('#overlay textarea','watch him'); await pl.click('#overlay >> text=Save'); await sleep(300);
+await pl.screenshot({path:'test/f-player-journal.png'});
+await gm.bringToFront(); await sleep(300); console.log('DM sees player note:', /Dex is dirty/.test(await gm.textContent('#journalPane')));
+await gm.screenshot({path:'test/f-gm-journal.png'});
+// notepad is local only
+await pl.bringToFront(); await pl.click('#journalPane >> text=My notepad'); await pl.fill('#overlay textarea','secret plan'); await sleep(600); await pl.keyboard.press('Escape');
+console.log('notepad saved locally:', await pl.evaluate(c=>localStorage.getItem('nct-notepad-'+c),code));
+// --- audio ---
+await gm.bringToFront(); await gm.click('#tabs button[data-tab=audio]'); await sleep(100);
+const [fc]=await Promise.all([gm.waitForEvent('filechooser'), gm.click('#audioPane >> text=Upload sounds')]); await fc.setFiles('test/beep.wav'); await sleep(800);
+await gm.fill('#audioPane input >> nth=0','Afterlife'); await gm.fill('#audioPane input >> nth=1','https://www.youtube.com/watch?v=x'); await gm.click('#audioPane >> text=+ Add music link'); await sleep(200);
+console.log('youtube link refused:', (await gm.textContent('#toast')).toLowerCase().includes('not an audio file'));
+await gm.fill('#audioPane input >> nth=0','Afterlife'); await gm.fill('#audioPane input >> nth=1','http://localhost:8123/beep.wav'.replace('http://','https://')); await gm.click('#audioPane >> text=+ Add music link'); await sleep(200);
+await gm.screenshot({path:'test/f-audio.png'});
+await gm.click('.soundgrid button >> nth=0'); await sleep(1200);
+await pl.bringToFront(); await sleep(300);
+console.log('player received + cached the sound file:', await pl.evaluate(()=>new Promise(res=>{ const r=indexedDB.open('night-city-table',3); r.onsuccess=()=>{ const t=r.result.transaction('audiocache','readonly').objectStore('audiocache').getAll(); t.onsuccess=()=>res(t.result.length+' file(s), '+(t.result[0]&&t.result[0].data.slice(0,15))); }; })));
+await gm.bringToFront(); await gm.click('.track button[title="Play for everyone"]'); await sleep(300);
+await pl.bringToFront(); await sleep(300);
+console.log('player now-playing bar:', await pl.textContent('#nowplaying'));
+await pl.click('#audioBtn'); await sleep(150); await pl.screenshot({path:'test/f-player-audio.png'});
+await pl.keyboard.press('Escape');
+// sheet look
+await pl.click('#tabs button[data-tab=sheets]'); await pl.click('text=+ New character'); await sleep(900); await pl.screenshot({path:'test/f-sheet.png'});
+// --- macros, toggles, damage ---
+await pl.click('.sheet >> text=+ New macro'); await pl.fill('#overlay input >> nth=0','Shoot'); await pl.fill('#overlay input >> nth=1','1d10! + @REF + @Handgun + 1');
+console.log('macro preview:', await pl.textContent('#overlay .mono.dim')); await pl.click('#overlay >> text=Save'); await sleep(900);
+await pl.click('.sheet button:has-text("Aiming")'); await pl.click('.sheet button:has-text("Smartgun link")'); await sleep(700);
+await pl.click('.sheet button:has-text("▶ Shoot")'); await sleep(500);
+await pl.click('.sheet >> text=+ Add weapon'); await sleep(700);
+await pl.click('table.wt button:has-text("Dmg")'); await sleep(500);
+await pl.keyboard.press('Escape'); await pl.click('#tabs button[data-tab=chat]'); await sleep(300);
+const last=await pl.$$eval('#chatlog .msg', e=>e.slice(-2).map(x=>x.innerText.replace(/\s+/g,' ')));
+console.log('macro roll:', last[0]); console.log('damage roll:', last[1]);
+console.log('macro bar:', (await pl.textContent('#macrobar')).replace(/\s+/g,' ').slice(0,120));
+await gm.bringToFront(); await sleep(400);
+console.log('GM tab:', await gm.evaluate(()=>document.querySelector('#tabs button.on').dataset.tab), '| GM last msg:', (await gm.$$eval('#chatlog .msg', e=>e.slice(-1).map(x=>x.innerText.replace(/\s+/g,' '))))[0]);
+await gm.click('#tabs button[data-tab=chat]'); await sleep(200);
+await gm.click('#chatlog .msg:last-child button:has-text("Apply damage")'); await sleep(200);
+console.log('damage calc:\n'+await gm.textContent('#overlay .mono'));
+await gm.screenshot({path:'test/f-damage.png'});
+await gm.click('#overlay button.pink:has-text("Apply damage")'); await sleep(500);
+console.log('after apply, chat:', (await gm.$$eval('#chatlog .msg', e=>e.slice(-1).map(x=>x.innerText.replace(/\s+/g,' '))))[0]);
+await pl.bringToFront(); await pl.click('#tabs button[data-tab=chat]'); await sleep(300); await pl.screenshot({path:'test/f-player-chat.png'});
+console.log('errors:', errs); await b.close(); })().catch(e=>{console.error('FAILED',e.message);process.exit(1)});

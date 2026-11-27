@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Night City Table</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1322">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Night City">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/*STYLE*/
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<div id="home" class="hidden">
+  <div class="home-wrap frame">
+    <div class="homebar"><button id="homeSettings" class="small" title="Settings: themes, colours, text size">⚙ Settings</button></div>
+    <div class="logo">NIGHT CITY TABLE</div>
+    <div class="tag">Cyberpunk 2020 virtual tabletop · DM hosts · players join with a code</div>
+    <div id="installBar" class="installbar hidden">
+      <img src="icon-192.png" alt="" width="44" height="44">
+      <div class="grow"><b>Get the app</b><div class="dim" id="installSub">Install Night City Table on this computer. It gets its own icon and window, and updates itself.</div></div>
+      <button id="installBtn" class="primary">Install app</button>
+    </div>
+    <div id="fileNotice" class="notice hidden">
+      You opened this file straight from your computer. You can host and play, but <b>invite links</b> and the <b>character import button</b> only work once the file is online.
+      It takes about a minute. See <a href="#" id="howHost">how to put it online</a>.
+    </div>
+    <div class="cards">
+      <div class="card">
+        <h2>YOUR NAME</h2>
+        <div class="col">
+          <input id="myName" maxlength="40" placeholder="What should we call you?">
+          <div class="row"><label>Colour</label><input id="myColor" type="color" value="#05d9e8" style="width:48px;height:32px;padding:0"></div>
+        </div>
+      </div>
+      <div class="card pinkc">
+        <h2>JOIN A GAME</h2>
+        <div class="col">
+          <input id="joinCode" placeholder="Paste invite link or game code">
+          <button id="joinBtn" class="pink">Join game</button>
+          <div id="recentJoins" class="gamelist"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>HOST A GAME (DM)</h2>
+        <div class="col">
+          <input id="newName" maxlength="80" placeholder="Campaign name, e.g. Night City 2079">
+          <button id="createBtn" class="primary">Create new game</button>
+          <div class="section-h">YOUR GAMES (SAVED ON THIS COMPUTER)</div>
+          <div id="myGames" class="gamelist"></div>
+          <div class="row"><button id="importGameBtn" class="small ghost">Load a backup file…</button><input id="importGameFile" type="file" accept=".json" class="hidden"></div>
+        </div>
+      </div>
+    </div>
+    <details class="help" id="helpBox">
+      <summary>How does this work?</summary>
+      <ol>
+        <li><b>The DM</b> clicks <i>Create new game</i>. That browser tab is now the game server. Keep it open while you play. Everything is saved on the DM's computer, and the DM can have as many games as they like.</li>
+        <li><b>The DM</b> clicks <i>Invite</i> in the top bar and sends the link to the players.</li>
+        <li><b>Players</b> open the link, type their name, and they're in. No account and nothing to install.</li>
+        <li>To bring in a character from cyberpunk2020character.com, open the <i>Sheets</i> tab and click <i>Import</i>.</li>
+      </ol>
+      <p id="hostSteps"><b>Putting it online (one time, free):</b> go to <a href="https://app.netlify.com/drop" target="_blank" rel="noopener">app.netlify.com/drop</a> and drag the whole <span class="mono">night-city-table</span> folder (the one with <span class="mono">index.html</span> inside) onto the page. You'll get a web address ending in <span class="mono">netlify.app</span>. Make a free Netlify account when it offers, so the site stays up for good. After that, everyone uses that address. Any DM can host their own games there, and each DM's games stay saved on their own computer.</p>
+    </details>
+  </div>
+</div>
+
+<!-- ============ TABLE ============ -->
+<div id="table" class="hidden">
+  <div id="topbar">
+    <button id="leaveBtn" class="small ghost" title="Back to home">⟵</button>
+    <div class="title" id="campTitle">—</div>
+    <div class="status"><span class="dot" id="netDot"></span><span id="netText">offline</span></div>
+    <button id="inviteBtn" class="small primary hidden">Invite players</button>
+    <div class="grow"></div>
+    <div id="people"></div>
+    <button id="audioBtn" class="small" title="Music and sound volume">🔊</button>
+    <button id="backupBtn" class="small ghost hidden" title="Download a backup of this game">Backup</button>
+    <button id="settingsBtn" class="small" title="Settings: themes, colours, text size">⚙</button>
+  </div>
+  <div id="tools">
+    <button data-tool="move" class="on" title="Move tokens / pan (drag empty space)">✥</button>
+    <button data-tool="ruler" title="Measure distance">📏</button>
+    <button data-tool="ping" title="Ping a spot (or Alt+click)">◎</button>
+    <div style="height:8px"></div>
+    <button id="centerBtn" title="Fit map to screen">⤢</button>
+  </div>
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+    <div id="maphint"></div>
+    <div id="nowplaying" class="hidden"></div>
+    <div id="zoomctl"><button class="small" id="zoomOut">−</button><button class="small" id="zoomIn">+</button></div>
+  </div>
+  <div id="splitter" title="Drag to resize"></div>
+  <div id="side">
+    <div id="tabs">
+      <button data-tab="chat" class="on">CHAT</button>
+      <button data-tab="sheets">SHEETS</button>
+      <button data-tab="journal">JOURNAL</button>
+      <button data-tab="init">INIT</button>
+      <button data-tab="books">BOOKS</button>
+      <button data-tab="maps" class="gmonly">MAPS</button>
+      <button data-tab="audio" class="gmonly">AUDIO</button>
+    </div>
+    <div class="pane" id="pane-chat">
+      <div id="chatlog"></div>
+      <div id="macrobar" class="hidden" style="border-top:1px solid var(--line);padding:6px 8px"></div>
+      <div id="chatbox">
+        <div id="quickdice">
+          <button data-roll="1d10!">d10!</button><button data-roll="1d10">d10</button><button data-roll="1d6">d6</button><button data-roll="2d6">2d6</button><button data-roll="3d6">3d6</button><button data-roll="4d6">4d6</button><button data-roll="1d100">d100</button>
+          <label class="row" style="margin-left:auto;font-size:13px"><input type="checkbox" id="privRoll"> secret</label>
+        </div>
+        <div class="row"><input id="chatInput" class="grow" placeholder="Say something, or /r 1d10!+5 Shoot"><button id="sendBtn" class="primary">Send</button></div>
+      </div>
+    </div>
+    <div class="pane hidden" id="pane-sheets"><div class="pane-scroll" id="sheetsPane"></div></div>
+    <div class="pane hidden" id="pane-init"><div class="pane-scroll" id="initPane"></div></div>
+    <div class="pane hidden" id="pane-journal"><div class="pane-scroll" id="journalPane"></div></div>
+    <div class="pane hidden" id="pane-books"><div class="pane-scroll" id="booksPane"></div></div>
+    <div class="pane hidden" id="pane-maps"><div class="pane-scroll" id="mapsPane"></div></div>
+    <div class="pane hidden" id="pane-audio"><div class="pane-scroll" id="audioPane"></div></div>
+  </div>
+</div>
+
+<!-- ============ IMPORT RECEIVER (opened by the bookmark button) ============ -->
+<div id="importscreen" class="hidden"><div class="col" style="max-width:520px;align-items:center">
+  <div class="logo" style="font-size:28px">NIGHT CITY TABLE</div>
+  <h2 id="impTitle" style="margin-top:16px">Waiting for character…</h2>
+  <p id="impText" class="dim"></p>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+/*BOOKMARKLET*/
+</script>
+<script>
+/*CORE*/
+</script>
+<script>
+/*PEERJS*/
+</script>
+<script>
+/*APP*/
+</script>
+</body>
+</html>

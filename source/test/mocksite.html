@@ -1,0 +1,15 @@
+<!DOCTYPE html><html><head><title>NCSE DATATERM v2.77</title></head><body><div id="root"><div class="sheet">CHARACTER SHEET</div></div>
+<script>
+const character={id:'1794545210419',name:'Cillian Byrne',role:'medtech',attributes:{INT:8,REF:6,TECH:7,COOL:5,ATTR:5,LUCK:4,MA:6,BODY:5,EMP:7},tempModifiers:{REF:1,INT:0},
+ skills:{'First Aid':4,'Awareness/Notice':5,'Diagnose Illness':3,'Pharmaceuticals':2,'Handgun':3}, customSkills:{'Know Language: Irish':{level:6,stat:'INT'}}, specialAbility:5,
+ cyberware:[{name:'Cyberoptics',hl:4,location:'eyes',desc:'Basic optic'},{name:'Biomonitor',hl:2,location:'body',desc:'Vitals readout'}],
+ inventory:[{name:'Militech Arms Avenger',type:'M. Pistol',wa:0,damage:'2d6+1',shots:10,rof:2,rel:'VR',range:50},{name:'Light Armor Jacket',sp:14,covers:'Torso, Arms'},{name:'Medtech Bag',quantity:1}],
+ humanity:36, woundDamage:3, mainEddies:1200, reputation:2, notes:'Sold to a ripperdoc at 12.', affiliations:['Trauma Team']};
+// fake React internals, shaped like a real React 18 tree
+const hook2={memoizedState:Object.assign({},character,{name:'Cillian Byrne'}),next:null};
+const hook1={memoizedState:false,next:hook2};
+const sheetFiber={memoizedProps:{character:{id:character.id,name:'Cillian Byrne'}},memoizedState:hook1,child:null,sibling:null};
+const appFiber={memoizedProps:{},memoizedState:null,child:sheetFiber,sibling:null}; sheetFiber.return=appFiber;
+const rootFiber={memoizedProps:{},memoizedState:null,child:appFiber,sibling:null,return:null}; appFiber.return=rootFiber;
+document.getElementById('root')['__reactContainer$x1y2']={stateNode:{current:rootFiber}};
+</script></body></html>
