@@ -87,14 +87,14 @@ jobs:
           path: dist/*.AppImage
 
   # The web version (play in a browser or on a phone, no install). Published to the gh-pages branch;
-  # GitHub serves it at https://noahhuston87-rgb.github.io/night-city-table/ once Pages is switched on.
+  # GitHub serves it at https://nightcitytable.com (the CNAME file) once Pages is switched on and the domain's DNS points to GitHub.
   web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Publish the web version
         run: |
-          mkdir -p /tmp/site && cp -r app/. /tmp/site/ && touch /tmp/site/.nojekyll
+          mkdir -p /tmp/site && cp -r app/. /tmp/site/ && touch /tmp/site/.nojekyll && echo nightcitytable.com > /tmp/site/CNAME
           cd /tmp/site
           git init -q -b gh-pages
           git config user.name "github-actions[bot]"

@@ -31,7 +31,7 @@
   const DESKTOP = !!window.nctDesktop; // running inside the installed desktop app
   const ONLINE = !DESKTOP && /^https?:$/.test(location.protocol);
   const APP_URL = ONLINE ? location.origin + location.pathname : '';
-  const WEB_URL = 'https://noahhuston87-rgb.github.io/night-city-table/'; // the online copy anyone can open in a browser
+  const WEB_URL = 'https://nightcitytable.com/'; // the online copy anyone can open in a browser
   const PEER_PREFIX = 'nctable-v1-';
 
   // ---------- IndexedDB (games are stored on the DM's computer) ----------
