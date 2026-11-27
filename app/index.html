@@ -390,6 +390,10 @@ table.wt input{width:100%;padding:2px 4px}
 #streamplayer.min{left:-10000px;top:0;bottom:auto} /* moved off screen, still playing */
 @media (max-width:760px){ #streamplayer{left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom))} #streamplayer.min{left:-10000px;transform:none} }
 
+/* opened from an invite link: just the name and the Join button */
+#home.invited #hostCard, #home.invited #helpBox, #home.invited #installBar, #home.invited #fileNotice { display:none !important; }
+#home.invited .cards { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+
 </style>
 </head>
 <body>
@@ -425,7 +429,7 @@ table.wt input{width:100%;padding:2px 4px}
           <div id="recentJoins" class="gamelist"></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="hostCard">
         <h2>HOST A GAME (DM)</h2>
         <div class="col">
           <input id="newName" maxlength="80" placeholder="Campaign name, e.g. Night City 2079">
@@ -3426,7 +3430,7 @@ window.peerReady = new Promise(function (resolve) {
       else bar.classList.add('hidden');
       return;
     }
-    if (!ONLINE || standalone() || LS.get('nct-installed', false)) { bar.classList.add('hidden'); return; }
+    bar.classList.add('hidden'); return; // the web version plays right in the browser: nothing to install
     bar.classList.remove('hidden');
     if (window.matchMedia('(pointer:coarse)').matches) { $('#installBar b').textContent = 'Add to your home screen'; $('#installSub').textContent = 'Put Night City Table on your phone\'s home screen. It opens full screen, like an app.'; }
     $('#installBtn').textContent = installEvt ? 'Install app' : 'How to install';
@@ -3491,7 +3495,7 @@ window.peerReady = new Promise(function (resolve) {
     if (h.startsWith('#import')) return runImportReceiver();
     showHome();
     const j = h.match(/join=([A-Za-z0-9]+)/), ho = h.match(/host=([A-Za-z0-9]+)/);
-    if (j) { $('#joinCode').value = j[1]; if (me.name) joinGame(j[1]); else { toast("Type your name, then press 'Join game'"); $('#myName').focus(); } }
+    if (j) { $('#joinCode').value = j[1]; if (me.name) joinGame(j[1]); else { $('#home').classList.add('invited'); toast("Type your name, then press 'Join game'"); $('#myName').focus(); } }
     else if (ho) DB.get(ho[1]).then(g => { if (g && me.name) hostGame(g); }).catch(() => { });
     else { const r = LS.get('nct-resume-host', null); LS.del('nct-resume-host'); if (r && Date.now() - r.at < 15 * 60e3) DB.get(r.id).then(g => { if (g && me.name) { hostGame(g); toast('Updated! Your game is open again.'); } }).catch(() => { }); }
   }

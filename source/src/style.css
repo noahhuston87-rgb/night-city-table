@@ -374,3 +374,7 @@ table.wt input{width:100%;padding:2px 4px}
 #streamplayer #spSlot iframe{display:block;border:0;width:280px}
 #streamplayer.min{left:-10000px;top:0;bottom:auto} /* moved off screen, still playing */
 @media (max-width:760px){ #streamplayer{left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom))} #streamplayer.min{left:-10000px;transform:none} }
+
+/* opened from an invite link: just the name and the Join button */
+#home.invited #hostCard, #home.invited #helpBox, #home.invited #installBar, #home.invited #fileNotice { display:none !important; }
+#home.invited .cards { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }

@@ -1132,7 +1132,7 @@
       else bar.classList.add('hidden');
       return;
     }
-    if (!ONLINE || standalone() || LS.get('nct-installed', false)) { bar.classList.add('hidden'); return; }
+    bar.classList.add('hidden'); return; // the web version plays right in the browser: nothing to install
     bar.classList.remove('hidden');
     if (window.matchMedia('(pointer:coarse)').matches) { $('#installBar b').textContent = 'Add to your home screen'; $('#installSub').textContent = 'Put Night City Table on your phone\'s home screen. It opens full screen, like an app.'; }
     $('#installBtn').textContent = installEvt ? 'Install app' : 'How to install';
@@ -1197,7 +1197,7 @@
     if (h.startsWith('#import')) return runImportReceiver();
     showHome();
     const j = h.match(/join=([A-Za-z0-9]+)/), ho = h.match(/host=([A-Za-z0-9]+)/);
-    if (j) { $('#joinCode').value = j[1]; if (me.name) joinGame(j[1]); else { toast("Type your name, then press 'Join game'"); $('#myName').focus(); } }
+    if (j) { $('#joinCode').value = j[1]; if (me.name) joinGame(j[1]); else { $('#home').classList.add('invited'); toast("Type your name, then press 'Join game'"); $('#myName').focus(); } }
     else if (ho) DB.get(ho[1]).then(g => { if (g && me.name) hostGame(g); }).catch(() => { });
     else { const r = LS.get('nct-resume-host', null); LS.del('nct-resume-host'); if (r && Date.now() - r.at < 15 * 60e3) DB.get(r.id).then(g => { if (g && me.name) { hostGame(g); toast('Updated! Your game is open again.'); } }).catch(() => { }); }
   }
