@@ -167,13 +167,17 @@
     return {
       v: 1, id: code(6), name: str(name || 'New Campaign', 80), createdAt: Date.now(), gmId,
       players: { [gmId]: { id: gmId, name: str(gmName || 'GM', 40), color: '#ff2a6d', isGM: true } },
-      maps: {}, activeMapId: null, chat: [], sheets: {}, init: { list: [], turn: 0 },
+      maps: {}, activeMapId: null, chat: [], sheets: {}, init: { list: [], turn: 0, round: 1, moved: {}, rules: { limit: true, turnOnly: false } },
       journal: { folders: {}, entries: {} },
       audio: { tracks: {}, music: { playing: false, track: null, startedAt: 0, offset: 0, loop: true, volume: 0.6 } }
     };
   }
   // older saves don't have the newer sections
   function upgrade(state) {
+    if (!state.init) state.init = { list: [], turn: 0 };
+    if (!state.init.moved) state.init.moved = {};
+    if (!state.init.rules) state.init.rules = { limit: true, turnOnly: false };
+    if (!state.init.round) state.init.round = 1;
     if (!state.journal) state.journal = { folders: {}, entries: {} };
     if (!state.journal.folders) state.journal.folders = {};
     if (!state.journal.entries) state.journal.entries = {};
@@ -241,6 +245,15 @@
     return out;
   }
 
+  // ---------- movement in combat ----------
+  // While anyone is on the initiative tracker, a token linked to a character can move up to its run
+  // distance (MA x 3 m) per round, split across as many moves as it likes. One grid square = 2 m.
+  function combatOn(state) { return !!(state.init && state.init.list && state.init.list.length); }
+  function tokenRun(state, t) { const sh = t && t.sheetId && state.sheets[t.sheetId]; return sh ? derived(sh).run : null; }
+  function moveMetres(m, x1, y1, x2, y2) { return Math.round(Math.hypot(x2 - x1, y2 - y1) / m.grid.size * 2 * 10) / 10; }
+  function movedThisRound(state, t) { upgrade(state); return Number(state.init.moved[t.id]) || 0; }
+  function isTokensTurn(state, t) { const cur = state.init.list[state.init.turn]; return !!(cur && t.sheetId && cur.sheetId === t.sheetId); }
+
   // ---------- journal visibility ----------
   // vis.mode: 'gm' (DM only), 'all' (everyone), 'some' (DM + the players in vis.ids). Owners always see their own.
   function canSeeEntry(state, e, pid) {
@@ -294,7 +307,7 @@
           target: (req.target !== undefined && req.target !== null && isFinite(Number(req.target))) ? clamp(req.target, -99, 999) : null });
         out.ops.push({ type: 'chat', msg });
         if (req.init && req.init.name) {
-          const init = clone(state.init) || { list: [], turn: 0 };
+          upgrade(state); const init = clone(state.init);
           const key = req.init.sheetId || req.init.name;
           init.list = init.list.filter(e => (e.sheetId || e.name) !== key);
           init.list.push({ id: uid(), name: str(req.init.name, 60), value: r.total, sheetId: req.init.sheetId || null });
@@ -353,6 +366,19 @@
         if (q.color !== undefined && /^#[0-9a-f]{6}$/i.test(q.color)) p.color = q.color;
         if (q.img !== undefined) p.img = isImg(q.img) ? q.img : '';
         if (isGM) { if (q.hidden !== undefined) p.hidden = !!q.hidden; if (q.sheetId !== undefined) { p.sheetId = q.sheetId && state.sheets[q.sheetId] ? q.sheetId : null; p.ownerId = p.sheetId ? (state.sheets[p.sheetId].ownerId || null) : null; } }
+        const moving = (p.x !== undefined && p.x !== t.x) || (p.y !== undefined && p.y !== t.y);
+        if (moving && combatOn(state) && t.sheetId && state.sheets[t.sheetId]) {
+          upgrade(state);
+          const dist = moveMetres(m, t.x, t.y, p.x ?? t.x, p.y ?? t.y);
+          const run = tokenRun(state, t); const used = movedThisRound(state, t);
+          if (!isGM) {
+            if (state.init.rules.turnOnly && !isTokensTurn(state, t)) return deny("It's not your turn. Wait for your turn in initiative to move.");
+            if (state.init.rules.limit && run !== null && used + dist > run + 0.05) return deny('Not enough movement left this round: ' + Math.max(0, Math.round((run - used) * 10) / 10) + ' m of ' + run + ' m');
+          }
+          const init = clone(state.init); init.moved[t.id] = Math.round((used + dist) * 10) / 10;
+          out.ops.push({ type: 'token.update', mapId: req.mapId, id: req.id, patch: p }, { type: 'init.set', init });
+          return out;
+        }
         out.ops.push({ type: 'token.update', mapId: req.mapId, id: req.id, patch: p }); return out;
       }
       case 'token.delete': {
@@ -380,8 +406,14 @@
       }
       case 'init.set': {
         if (!isGM) return deny();
+        upgrade(state);
         const i = req.init || {}; const list = (Array.isArray(i.list) ? i.list : []).slice(0, 60).map(e => ({ id: str(e.id || uid(), 20), name: str(e.name, 60), value: clamp(e.value, -99, 999), sheetId: e.sheetId || null }));
-        out.ops.push({ type: 'init.set', init: { list, turn: clamp(i.turn || 0, 0, Math.max(0, list.length - 1)) } }); return out;
+        const rules = i.rules ? { limit: i.rules.limit !== false, turnOnly: !!i.rules.turnOnly } : state.init.rules;
+        let round = clamp(state.init.round || 1, 1, 9999), moved = clone(state.init.moved) || {};
+        if (req.newRound) { round += 1; moved = {}; }
+        if (!list.length) { round = 1; moved = {}; }
+        if (i.resetToken) delete moved[i.resetToken];
+        out.ops.push({ type: 'init.set', init: { list, turn: clamp(i.turn || 0, 0, Math.max(0, list.length - 1)), round, moved, rules } }); return out;
       }
       case 'journal.folder.upsert': {
         if (!isGM) return deny(); upgrade(state);
@@ -552,5 +584,5 @@
   }
 
   root.NCT = { uid, code, clone, roll, rollToText, STATS, SKILLS_BY_STAT, SKILL_STAT, ROLES, LOCS, weaponSkill, blankSheet, statVal, effStat, derived, woundInfo, skillTotal,
-    DEFAULT_MODS, strBonus, cleanModValue, newCampaign, newMap, upgrade, apply, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
+    DEFAULT_MODS, strBonus, cleanModValue, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
 })(typeof window !== 'undefined' ? window : globalThis);

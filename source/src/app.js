@@ -478,16 +478,24 @@
     if (pings.length) requestAnimationFrame(draw);
   }
   // while dragging a token: line from where it started, distance in squares and metres, and its run range
+  // how far this token may still move: its run distance, minus what it already moved this round in combat
+  function moveBudget(t) {
+    if (!S || !t || !t.sheetId || !S.sheets[t.sheetId]) return null;
+    const run = N.tokenRun(S, t); if (run === null) return null;
+    if (!N.combatOn(S)) return { run, left: run, combat: false, limit: false };
+    const used = N.movedThisRound(S, t);
+    return { run, used, left: Math.max(0, Math.round((run - used) * 10) / 10), combat: true, limit: N.upgrade(S).init.rules.limit };
+  }
   function drawMoveRuler(t, m, v, layer) {
     const g = m.grid.size, p = tokenPx(t, m);
     let nx = drag.x, ny = drag.y; if (g >= 4) { nx = snap(nx, g, m.grid.ox); ny = snap(ny, g, m.grid.oy); }
     const x1 = t.x + p / 2, y1 = t.y + p / 2, x2 = nx + p / 2, y2 = ny + p / 2;
     const sq = Math.hypot(x2 - x1, y2 - y1) / g, metres = Math.round(sq * 2);
-    const sh = t.sheetId && S.sheets[t.sheetId]; const run = sh ? N.derived(sh).run : null;
-    const over = run !== null && metres > run;
+    const b = moveBudget(t); const run = b ? b.left : null;
+    const over = run !== null && metres > run + 0.05;
     ctx.save();
     if (layer === 'under') {
-      if (run) { ctx.setLineDash([8 / v.z, 6 / v.z]); ctx.strokeStyle = TH.s; ctx.globalAlpha = 0.6; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(x1, y1, run / 2 * g, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 0.08; ctx.fillStyle = TH.s; ctx.fill(); ctx.globalAlpha = 1; }
+      if (run) { ctx.setLineDash([8 / v.z, 6 / v.z]); ctx.strokeStyle = b && b.combat && over ? '#ff3344' : TH.s; ctx.globalAlpha = 0.6; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(x1, y1, run / 2 * g, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 0.08; ctx.fillStyle = TH.s; ctx.fill(); ctx.globalAlpha = 1; }
       ctx.globalAlpha = 0.35; ctx.strokeStyle = TH.p; ctx.lineWidth = 2 / v.z; ctx.setLineDash([4 / v.z, 4 / v.z]); ctx.strokeRect(nx, ny, p, p); // where it will land
       ctx.restore(); return;
     }
@@ -496,7 +504,7 @@
     ctx.strokeStyle = col; ctx.lineWidth = 3 / v.z; ctx.setLineDash([10 / v.z, 6 / v.z]);
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x1, y1, 4 / v.z, 0, Math.PI * 2); ctx.fill();
-    const label = sq.toFixed(1) + ' sq · ' + metres + ' m' + (run !== null ? (over ? '  OVER RUN (' + run + ' m)' : '  / run ' + run + ' m') : '');
+    const label = sq.toFixed(1) + ' sq · ' + metres + ' m' + (b ? (b.combat ? (over ? '  TOO FAR · ' + b.left + ' m left this round' : '  · ' + Math.round((b.left - metres) * 10) / 10 + ' m left after') : (over ? '  OVER RUN (' + b.run + ' m)' : '  / run ' + b.run + ' m')) : '');
     ctx.font = 'bold ' + (15 / v.z) + 'px "Share Tech Mono", monospace'; const tw = ctx.measureText(label).width;
     let lx = x2 + p / 2 + 8 / v.z, ly = y2 - 10 / v.z;
     if ((lx + tw + 8 / v.z) * v.z + v.x > W) lx = x2 - p / 2 - 12 / v.z - tw; // keep it on screen
@@ -553,7 +561,14 @@
     if (e.altKey || tool === 'ping') { request({ type: 'ping', x: w.x, y: w.y, mapId: m.id }); return; }
     if (tool === 'ruler') { ruler = { x1: w.x, y1: w.y, x2: w.x, y2: w.y, active: true }; draw(); return; }
     const t = hitToken(w.x, w.y);
-    if (t) { selected = t.id; if (canMoveToken(t)) drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y }; draw(); renderTokenHud(); return; }
+    if (t) {
+      selected = t.id;
+      if (canMoveToken(t)) {
+        if (!isGM() && N.combatOn(S) && t.sheetId && N.upgrade(S).init.rules.turnOnly && !N.isTokensTurn(S, t)) toast("It's not your turn yet. You can move when initiative reaches you.", true);
+        else drag = { id: t.id, dx: w.x - t.x, dy: w.y - t.y, x: t.x, y: t.y };
+      }
+      draw(); renderTokenHud(); return;
+    }
     selected = null; pan = { sx: e.offsetX, sy: e.offsetY, moved: false, button: 0 }; draw(); renderTokenHud();
   });
   cv.addEventListener('pointermove', e => {
@@ -569,7 +584,11 @@
     if (drag && m) {
       const t = m.tokens[drag.id]; let x = drag.x, y = drag.y;
       if (m.grid.size >= 4) { x = snap(x, m.grid.size, m.grid.ox); y = snap(y, m.grid.size, m.grid.oy); }
-      if (t && (x !== t.x || y !== t.y)) { t.x = x; t.y = y; request({ type: 'token.update', mapId: m.id, id: drag.id, patch: { x, y } }); }
+      if (t && (x !== t.x || y !== t.y)) {
+        const b = moveBudget(t);
+        if (b && !isGM() && b.limit && N.moveMetres(m, t.x, t.y, x, y) > b.left + 0.05) toast("Not enough movement left this round (" + b.left + ' m). It resets next round.', true);
+        else { if (isGM()) { t.x = x; t.y = y; } request({ type: 'token.update', mapId: m.id, id: drag.id, patch: { x, y } }); }
+      }
       drag = null; draw(); return;
     }
     if (ruler && ruler.active) { ruler.active = false; const r = ruler; setTimeout(() => { if (ruler === r) { ruler = null; draw(); } }, 2500); }
@@ -699,21 +718,38 @@
   // ================= INITIATIVE =================
   function renderInit() {
     const box = $('#initPane'); box.textContent = '';
-    const init = S.init || { list: [], turn: 0 };
-    const set = (list, turn) => request({ type: 'init.set', init: { list, turn: turn === undefined ? init.turn : turn } });
+    const init = N.upgrade(S).init;
+    const set = (list, turn, extra) => request(Object.assign({ type: 'init.set', init: { list, turn: turn === undefined ? init.turn : turn } }, extra || {}));
     const mine = Object.values(S.sheets).filter(s => s.ownerId === me.id || (isGM() && !s.ownerId));
     if (mine.length) box.append(el('div', { class: 'row', style: 'flex-wrap:wrap' }, ...mine.map(s => el('button', { class: 'small primary', text: '🎲 ' + s.name, title: 'Roll initiative (1d10! + REF' + (s.role === 'solo' ? ' + Combat Sense' : '') + ')', onclick: () => rollInit(s) }))));
-    if (!init.list.length) box.append(el('div', { class: 'dim', text: 'Nobody has rolled initiative yet. Roll from the buttons above or from a character sheet.' }));
-    init.list.forEach((e, i) => box.append(el('div', { class: 'init-row' + (i === init.turn ? ' cur' : '') },
-      el('span', { class: 'v', text: String(e.value) }), el('span', { class: 'grow', text: e.name }),
-      i === init.turn ? el('span', { class: 'badge b-crit', text: 'NOW' }) : null,
-      isGM() ? el('button', { class: 'small ghost', text: '✕', onclick: () => { const l = init.list.filter(x => x.id !== e.id); set(l, Math.min(init.turn, Math.max(0, l.length - 1))); } }) : null)));
+    if (!init.list.length) { box.append(el('div', { class: 'dim', text: 'Nobody has rolled initiative yet. Roll from the buttons above or from a character sheet. Once someone is on the list, combat movement rules switch on.' })); }
+    else box.append(el('div', { class: 'row' }, el('span', { class: 'section-h grow', style: 'margin:0', text: 'Round ' + init.round }),
+      el('span', { class: 'dim', style: 'font-size:.75rem', text: init.rules.limit ? 'Movement: run distance per round' + (init.rules.turnOnly ? ', on your turn only' : '') : 'Movement: unlimited' })));
+    const m = activeMap();
+    const tokFor = e => m && e.sheetId ? Object.values(m.tokens).find(t => t.sheetId === e.sheetId) : null;
+    init.list.forEach((e, i) => {
+      const t = tokFor(e); const b = t ? moveBudget(t) : null;
+      box.append(el('div', { class: 'init-row' + (i === init.turn ? ' cur' : '') },
+        el('span', { class: 'v', text: String(e.value) }),
+        el('div', { class: 'grow' }, el('div', { text: e.name }),
+          b ? el('div', { class: 'dim', style: 'font-size:.72rem', text: 'moved ' + (b.used || 0) + ' / ' + b.run + ' m' + (b.left <= 0 ? ' · no movement left' : '') }) : null),
+        i === init.turn ? el('span', { class: 'badge b-crit', text: 'NOW' }) : null,
+        isGM() && t && b && b.used ? el('button', { class: 'small ghost', text: '↺', title: 'Give back this round\'s movement', onclick: () => set(init.list, init.turn, { init: { list: init.list, turn: init.turn, resetToken: t.id } }) }) : null,
+        isGM() ? el('button', { class: 'small ghost', text: '✕', onclick: () => { const l = init.list.filter(x => x.id !== e.id); set(l, Math.min(init.turn, Math.max(0, l.length - 1))); } }) : null));
+    });
     if (isGM()) {
       const n = el('input', { class: 'grow', placeholder: 'Name' }), v = el('input', { type: 'number', value: 10 });
+      const next = () => { const len = Math.max(1, init.list.length); const t = (init.turn + 1) % len; set(init.list, t, t === 0 ? { newRound: true } : null); if (t === 0) toast('Round ' + (init.round + 1) + ': movement resets'); };
+      const rules = (patch) => request({ type: 'init.set', init: { list: init.list, turn: init.turn, rules: Object.assign({}, init.rules, patch) } });
       box.append(el('div', { class: 'row' },
-        el('button', { class: 'primary grow', text: 'Next turn ▶', disabled: !init.list.length, onclick: () => set(init.list, (init.turn + 1) % Math.max(1, init.list.length)) }),
+        el('button', { class: 'primary grow', text: 'Next turn ▶', disabled: !init.list.length, onclick: next }),
         el('button', { text: '◀', disabled: !init.list.length, onclick: () => set(init.list, (init.turn - 1 + init.list.length) % Math.max(1, init.list.length)) }),
-        el('button', { class: 'danger', text: 'Clear', onclick: () => set([], 0) })),
+        el('button', { text: 'New round', title: 'Back to the top of the order and reset everyone\'s movement', disabled: !init.list.length, onclick: () => { set(init.list, 0, { newRound: true }); toast('Round ' + (init.round + 1) + ': movement resets'); } }),
+        el('button', { class: 'danger', text: 'End combat', onclick: () => set([], 0) })),
+        el('div', { class: 'section-h', text: 'COMBAT MOVEMENT RULES' }),
+        el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: init.rules.limit, onchange: e => rules({ limit: e.target.checked }) }), 'Limit movement to run distance (MA × 3 m) per round, split across moves'),
+        el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: init.rules.turnOnly, onchange: e => rules({ turnOnly: e.target.checked }) }), 'Players can only move on their own turn'),
+        el('div', { class: 'dim', style: 'font-size:.75rem', text: 'You (the DM) can always move any token. Movement only counts for tokens linked to a character.' }),
         el('div', { class: 'section-h', text: 'ADD BY HAND' }),
         el('div', { class: 'row' }, n, v, el('button', { text: 'Add', onclick: () => { if (!n.value.trim()) return; const l = init.list.concat([{ id: N.uid(), name: n.value.trim(), value: Number(v.value) || 0 }]).sort((a, b) => b.value - a.value); set(l); } })));
     }
