@@ -53,6 +53,11 @@ fn bookmark_page(href: String) -> Result<(), String> {
 <li><b>Drag this pink button</b> up onto the bookmarks bar:<p><a href=\"{esc}\" style=\"display:inline-block;background:#ff2a6d;color:#fff;padding:10px 16px;border-radius:6px;font-weight:700;text-decoration:none\">&#8681; Send to Night City Table</a></p></li>\
 <li>Open your character on <b>cyberpunk2020character.com</b> and click the bookmark.</li>\
 <li>Switch back to the Night City Table app. Your character pops up there.</li></ol>\
+<h2 style=\"color:#05d9e8;font-size:20px\">Dragging doesn't work?</h2>\
+<p>Copy the code, then add a bookmark by hand: right-click the bookmarks bar, choose <b>Add page</b> (Chrome) / <b>Add page</b> on the favorites bar (Edge) / <b>Add Bookmark</b> (Firefox). Name it <b>Send to Night City Table</b>, paste the code into the <b>URL</b> box, and save.</p>\
+<p><button id=\"cp\" style=\"background:#05d9e8;color:#000;border:0;padding:10px 16px;border-radius:6px;font-weight:700;font-size:16px;cursor:pointer\">Copy bookmark code</button></p>\
+<textarea id=\"code\" readonly style=\"width:100%;height:70px;background:#000;color:#7f8;border:1px solid #334\">{esc}</textarea>\
+<script>document.getElementById('cp').onclick=function(){{var t=document.getElementById('code');t.select();var ok=false;try{{ok=document.execCommand('copy')}}catch(e){{}}if(navigator.clipboard)navigator.clipboard.writeText(t.value).then(function(){{}},function(){{}});this.textContent=ok?'Copied!':'Copied (or press Ctrl+C)';}};</script>\
 <p style=\"color:#8aa0c2\">You can close this page now. You only need to do this once.</p></body>"
     );
     let path = std::env::temp_dir().join("night-city-table-import-button.html");
