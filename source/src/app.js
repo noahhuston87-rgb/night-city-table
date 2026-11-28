@@ -310,6 +310,7 @@
     if (!S) { $('#campTitle').textContent = 'Connecting to game ' + (joinCode || ''); draw(); return; }
     $('#campTitle').textContent = S.name;
     $('#inviteBtn').classList.toggle('hidden', !isGM());
+    checkAnnouncements();
     const wb = $('#webBtn'); wb.classList.toggle('hidden', role !== 'host'); wb.textContent = '🌐 Web: ' + (S.allowWeb ? 'ON' : 'off'); wb.classList.toggle('primary', !!S.allowWeb);
     $('#backupBtn').classList.toggle('hidden', !isGM());
     $$('.gmonly').forEach(b => b.classList.toggle('hidden', !isGM()));

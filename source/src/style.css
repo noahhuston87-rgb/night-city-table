@@ -407,3 +407,19 @@ table.wt input{width:100%;padding:2px 4px}
 .npcrow{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--line)}
 .tl-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:start;margin:5px 0;line-height:1.45}.tl-y{color:var(--s)}
 @media (max-width:760px){.tl-row{grid-template-columns:1fr auto}.tl-y{grid-column:1/-1}}
+
+#annBtn{position:relative}
+.badge-dot{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--red,#ff2a6d);color:#fff;font-size:11px;line-height:18px;text-align:center}
+.ann{border:1px solid var(--line);border-left:3px solid var(--s);padding:12px;margin:8px 0;background:var(--field)}
+.ann-head{display:flex;gap:10px;align-items:baseline;font-size:1.05rem;color:var(--p);text-transform:uppercase}
+.ann-text{white-space:pre-wrap;line-height:1.5;margin-top:8px}
+.ann-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:10px}
+.ann-imgs.one{grid-template-columns:1fr}
+.ann-imgs img{width:100%;max-height:60vh;object-fit:contain;background:#000;border:1px solid var(--line);cursor:zoom-in}
+.ann-imgs.edit{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.ann-thumb{position:relative}.ann-thumb img{height:100px;object-fit:cover;cursor:default}.ann-thumb button{position:absolute;top:4px;right:4px;min-height:0;padding:0 6px}
+.ann-drop{border:2px dashed var(--line);padding:18px;text-align:center;color:var(--d);cursor:pointer}
+.ann-drop.over{border-color:var(--p);color:var(--p)}
+.picview{position:fixed;inset:0;z-index:100;background:#000e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:zoom-out}
+.picview img{max-width:96vw;max-height:90vh;object-fit:contain}
+@media (max-width:760px){#annBtn{min-width:40px}}

@@ -212,6 +212,8 @@
       case 'sheet.delete': delete state.sheets[op.id]; for (const mid in state.maps) for (const tid in state.maps[mid].tokens) if (state.maps[mid].tokens[tid].sheetId === op.id) state.maps[mid].tokens[tid].sheetId = null; break;
       case 'init.set': state.init = op.init; break;
       case 'web.allow': state.allowWeb = !!op.on; break;
+      case 'announce.add': state.announcements = state.announcements || []; state.announcements.push(op.a); if (state.announcements.length > 50) state.announcements.splice(0, state.announcements.length - 50); break;
+      case 'announce.delete': state.announcements = (state.announcements || []).filter(a => a.id !== op.id); break;
       case 'rules.set': state.houseRules = state.houseRules || {}; if (op.sections) state.houseRules[op.line] = op.sections; else delete state.houseRules[op.line]; break;
       case 'journal.folder.upsert': upgrade(state); state.journal.folders[op.folder.id] = op.folder; break;
       case 'journal.folder.delete': upgrade(state); delete state.journal.folders[op.id]; for (const id in state.journal.entries) if (state.journal.entries[id].folderId === op.id) state.journal.entries[id].folderId = null; break;
@@ -570,6 +572,15 @@
         if (!isGM && s.ownerId !== sender.id) return deny();
         out.ops.push({ type: 'sheet.delete', id: req.id }); return out;
       }
+      case 'announce.send': { // DM: a message with pictures, to everyone or chosen players
+        if (!isGM) return deny('Only the DM can send announcements');
+        const imgs = (Array.isArray(req.imgs) ? req.imgs : []).filter(u => isImg(u) && String(u).length <= 2000000).slice(0, 6);
+        const text = str(req.text || '', 4000).trim(), title = str(req.title || '', 120).trim();
+        if (!text && !imgs.length && !title) return deny('Write something or add a picture');
+        const to = Array.isArray(req.to) && req.to.length ? req.to.map(x => str(x, 40)).slice(0, 50) : null;
+        out.ops.push({ type: 'announce.add', a: { id: uid(), ts: Date.now(), from: str((state.players[sender.id] && state.players[sender.id].name) || 'DM', 40), title, text, imgs, to } }); return out;
+      }
+      case 'announce.delete': if (!isGM) return deny(); out.ops.push({ type: 'announce.delete', id: str(req.id, 20) }); return out;
       case 'rules.set': { // DM's own version of the quick rules (house rules); null = back to the original
         if (!isGM) return deny('Only the DM can change the rules');
         const line = req.line === 'red' ? 'red' : '2020';
@@ -656,6 +667,7 @@
   function viewFor(state, playerId) {
     const s = clone(state);
     s.chat = s.chat.filter(m => !m.to || m.to.includes(playerId));
+    if (playerId !== s.gmId) s.announcements = (s.announcements || []).filter(a => !a.to || a.to.includes(playerId));
     for (const id in s.sheets) if (!s.sheets[id].ownerId) delete s.sheets[id];
     upgrade(s);
     if (playerId !== s.gmId) {
@@ -671,6 +683,7 @@
     const out = [];
     for (const o of ops) {
       if (o.type === 'chat' && !canSeeMsg(o.msg, playerId)) continue;
+      if (o.type === 'announce.add' && o.a.to && !o.a.to.includes(playerId)) continue;
       if (o.type === 'sheet.upsert' && !o.sheet.ownerId) { out.push({ type: 'sheet.delete', id: o.sheet.id }); continue; }
       if (o.type.startsWith('journal.') || o.type.startsWith('audio.track.')) continue; // journal goes out through journalDiff; the library stays with the DM
       out.push(o);

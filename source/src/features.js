@@ -1219,3 +1219,94 @@
     m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q), body,
       el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary of the official Cyberpunk history (2020, RED and 2077), written for Night City Table. Some early dates differ between books; your table\'s version always wins.' }));
   }
+
+  // ================= ANNOUNCEMENTS (DM → players, text + pictures) =================
+  const annSeenKey = () => 'nct-ann-seen-' + (S && S.id);
+  const annSeen = () => new Set(LS.get(annSeenKey(), []));
+  const markSeen = ids => { const s = annSeen(); ids.forEach(i => s.add(i)); LS.set(annSeenKey(), [...s].slice(-200)); };
+  let annShowing = false;
+  function checkAnnouncements() {
+    if (!S) return;
+    const list = S.announcements || [], seen = annSeen();
+    if (isGM()) markSeen(list.filter(a => !seen.has(a.id)).map(a => a.id)); // the DM wrote them
+    const unseen = list.filter(a => !annSeen().has(a.id));
+    const badge = $('#annBadge'); if (badge) { badge.textContent = unseen.length || ''; badge.classList.toggle('hidden', !unseen.length); }
+    if (unseen.length && !annShowing && !document.querySelector('#overlay:not(.hidden) .modal')) showAnnouncements(unseen.slice().reverse(), true);
+  }
+  function annCard(a, opts) {
+    const who = a.to ? 'To: ' + a.to.map(id => (S.players[id] && S.players[id].name) || 'player').join(', ') : 'To: everyone';
+    return el('div', { class: 'ann' },
+      el('div', { class: 'ann-head' }, el('b', { class: 'grow', text: a.title || 'Announcement' }), el('span', { class: 'dim', text: new Date(a.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) })),
+      isGM() ? el('div', { class: 'dim', style: 'font-size:.75rem', text: who }) : null,
+      a.text ? el('div', { class: 'ann-text', text: a.text }) : null,
+      a.imgs && a.imgs.length ? el('div', { class: 'ann-imgs' + (a.imgs.length === 1 ? ' one' : '') }, ...a.imgs.map(u => el('img', { src: u, title: 'Click to see it full size', onclick: () => viewPicture(u) }))) : null,
+      opts && opts.del && isGM() ? el('div', { class: 'row', style: 'margin-top:6px' }, el('div', { class: 'grow' }), el('button', { class: 'small danger', text: 'Delete', onclick: () => askConfirm('Delete this announcement?', 'It disappears for everyone.', 'Delete', () => { request({ type: 'announce.delete', id: a.id }); setTimeout(openAnnouncements, 150); }) })) : null);
+  }
+  function viewPicture(u) {
+    const box = el('div', { class: 'picview', onclick: () => box.remove() }, el('img', { src: u }), el('div', { class: 'dim', text: 'Click anywhere to close' }));
+    document.body.append(box);
+  }
+  function showAnnouncements(items, isNew) {
+    annShowing = true;
+    const m = modal('📣 ' + (items.length > 1 ? items.length + ' new announcements' : 'Announcement from ' + (items[0].from || 'the DM')), true);
+    m.classList.add('ann-modal');
+    m.append(...items.map(a => annCard(a)), el('div', { class: 'row', style: 'margin-top:12px' }, el('div', { class: 'grow' }), el('button', { class: 'primary', style: 'padding:10px 24px', text: 'Got it', onclick: () => closeModal() })));
+    markSeen(items.map(a => a.id));
+    const badge = $('#annBadge'); if (badge) badge.classList.add('hidden');
+    const obs = new MutationObserver(() => { if (!document.body.contains(m)) { annShowing = false; obs.disconnect(); setTimeout(checkAnnouncements, 50); } }); obs.observe(document.body, { childList: true, subtree: true });
+  }
+  function openAnnouncements() {
+    const list = ((S && S.announcements) || []).slice().reverse();
+    const m = modal('📣 Announcements', true);
+    if (isGM()) m.append(el('button', { class: 'pink', style: 'width:100%;padding:12px;margin-bottom:10px', text: '+ New announcement', onclick: composeAnnouncement }));
+    if (!list.length) m.append(el('p', { class: 'dim', text: isGM() ? 'Nothing sent yet. Send your players news, pictures, handouts or session times.' : 'No announcements from your DM yet.' }));
+    m.append(...list.map(a => annCard(a, { del: true })));
+    markSeen(list.map(a => a.id)); checkAnnouncements();
+  }
+  // shrink big photos so they travel fast (max 1600 px, JPEG); keeps small pictures and see-through PNGs as they are
+  function shrinkPicture(file) {
+    return new Promise((res, rej) => {
+      const rd = new FileReader(); rd.onerror = rej;
+      rd.onload = () => { const src = rd.result; if (src.length < 350000) return res(src);
+        const im = new Image(); im.onerror = () => rej(new Error('not a picture'));
+        im.onload = () => { const k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight)); const c = el('canvas', { width: Math.round(im.naturalWidth * k), height: Math.round(im.naturalHeight * k) }); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); let out = c.toDataURL('image/jpeg', 0.85); if (out.length > 1900000) out = c.toDataURL('image/jpeg', 0.6); res(out); };
+        im.src = src; };
+      rd.readAsDataURL(file);
+    });
+  }
+  function composeAnnouncement() {
+    if (!isGM()) return;
+    const m = modal('📣 New announcement', true);
+    const title = el('input', { placeholder: 'Title (optional), e.g. "Next session: Saturday 7pm"', style: 'width:100%' });
+    const text = el('textarea', { placeholder: 'Your message…', style: 'width:100%;min-height:120px' });
+    const imgs = [];
+    const strip = el('div', { class: 'ann-imgs edit' });
+    const drawImgs = () => { strip.textContent = ''; imgs.forEach((u, i) => strip.append(el('div', { class: 'ann-thumb' }, el('img', { src: u }), el('button', { class: 'small danger', text: '✕', title: 'Remove', onclick: () => { imgs.splice(i, 1); drawImgs(); } })))); };
+    const addFiles = async files => { for (const f of [...files]) { if (!/^image\//.test(f.type)) { toast(f.name + " isn't a picture", true); continue; } if (imgs.length >= 6) { toast('Up to 6 pictures per announcement', true); break; } try { imgs.push(await shrinkPicture(f)); } catch (e) { toast("Couldn't open " + f.name, true); } } drawImgs(); };
+    const file = el('input', { type: 'file', accept: 'image/*', multiple: true, class: 'hidden', onchange: e => addFiles(e.target.files) });
+    const onPaste = e => { const fs = [...((e.clipboardData || {}).items || [])].filter(i => i.type.startsWith('image/')).map(i => i.getAsFile()); if (fs.length) { e.preventDefault(); addFiles(fs); } };
+    document.addEventListener('paste', onPaste);
+    const drop = el('div', { class: 'ann-drop', text: '🖼 Drop pictures here, paste them (Ctrl+V), or click to choose', onclick: () => file.click() });
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); }); drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); });
+    const players = Object.entries(S.players).filter(([id]) => id !== S.gmId);
+    const everyone = el('input', { type: 'radio', name: 'annto', checked: true });
+    const some = el('input', { type: 'radio', name: 'annto' });
+    const picks = el('div', { class: 'row hidden', style: 'flex-wrap:wrap;gap:10px;margin-left:24px' }, ...players.map(([id, p]) => el('label', { class: 'row' }, el('input', { type: 'checkbox', value: id }), p.name || 'Player')));
+    everyone.onchange = some.onchange = () => picks.classList.toggle('hidden', !some.checked);
+    const send = () => {
+      const to = some.checked ? [...picks.querySelectorAll('input:checked')].map(x => x.value) : null;
+      if (to && !to.length) return toast('Tick who should get it, or choose Everyone', true);
+      if (!text.value.trim() && !title.value.trim() && !imgs.length) return toast('Write something or add a picture', true);
+      request({ type: 'announce.send', title: title.value, text: text.value, imgs: imgs.slice(), to });
+      document.removeEventListener('paste', onPaste); closeModal(); toast('Announcement sent' + (to ? ' to ' + to.length + ' player' + (to.length > 1 ? 's' : '') : ' to everyone'));
+    };
+    const obs = new MutationObserver(() => { if (!document.body.contains(text)) { document.removeEventListener('paste', onPaste); obs.disconnect(); } }); obs.observe(document.body, { childList: true, subtree: true });
+    m.append(el('div', { class: 'col', style: 'gap:8px' }, title, text, drop, file, strip,
+      el('div', { class: 'section-h', text: 'Send to' }),
+      el('label', { class: 'row' }, everyone, 'Everyone'),
+      players.length ? el('label', { class: 'row' }, some, 'Only some players') : el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Players who join later will still see it.' }), picks,
+      el('div', { class: 'row', style: 'margin-top:8px' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Cancel', onclick: closeModal }), el('button', { class: 'pink', style: 'padding:10px 22px', text: '📣 Send', onclick: send }))));
+    setTimeout(() => text.focus(), 50);
+  }
+  { const b = document.getElementById('annBtn'); if (b) b.onclick = () => { if (S) openAnnouncements(); }; }
