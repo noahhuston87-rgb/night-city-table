@@ -1,5 +1,5 @@
 /* Night City Table service worker: makes the installed app open instantly and keeps it up to date. */
-const VERSION = '20261128062415';
+const VERSION = '20261128063725';
 const CACHE = 'nct-' + VERSION;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './pdf.min.js', './pdf.worker.min.js'];
 const CDN = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];

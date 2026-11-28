@@ -723,17 +723,48 @@
       ['Humanity & cyberware', ['Humanity = EMP × 10. Installing cyberware costs Humanity Loss.', 'EMP drops 1 for every full 10 Humanity lost. Run out and you are a cyberpsycho.']]
     ]
   };
-  function openQuickRef(line) {
-    const m = modal((line === 'red' ? 'Cyberpunk RED' : 'Cyberpunk 2020') + ': rules quick reference', true);
+  function rulesFor(line) { return (S && S.houseRules && S.houseRules[line]) || QUICK_REF[line]; }
+  function openQuickRef(line, editing) {
+    const custom = !!(S && S.houseRules && S.houseRules[line]);
+    const m = modal((line === 'red' ? 'Cyberpunk RED' : 'Cyberpunk 2020') + ': rules quick reference' + (custom ? ' (house rules)' : ''), true);
+    if (editing && isGM()) return editQuickRef(m, line);
     const q = el('input', { class: 'grow', placeholder: 'Filter, e.g. head, autofire, death' });
     const body = el('div', { class: 'col', style: 'gap:12px' });
     const draw = () => { body.textContent = ''; const t = q.value.trim().toLowerCase();
-      for (const [title, lines] of QUICK_REF[line]) { const ls = t ? lines.filter(x => (title + ' ' + x).toLowerCase().includes(t)) : lines; if (!ls.length) continue;
-        body.append(el('div', { class: 'box', style: 'border:1px solid var(--line);padding:10px' }, el('div', { class: 'section-h', style: 'margin:0 0 6px', text: title }), ...ls.map(x => el('div', { style: 'margin:3px 0;line-height:1.45', text: x })))); }
+      for (const [title, lines] of rulesFor(line)) { const ls = t ? lines.filter(x => (title + ' ' + x).toLowerCase().includes(t)) : lines; if (!ls.length) continue;
+        body.append(el('div', { class: 'box', style: 'border:1px solid var(--line);padding:10px' }, el('div', { class: 'section-h', style: 'margin:0 0 6px', text: title }), ...ls.map(x => el('div', { style: 'margin:3px 0;line-height:1.45;white-space:pre-wrap', text: x })))); }
       if (!body.children.length) body.append(el('div', { class: 'dim', text: 'Nothing matches.' })); };
     q.oninput = draw; draw();
-    m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q, el('button', { class: 'small', text: line === 'red' ? 'Switch to 2020' : 'Switch to RED', onclick: () => openQuickRef(line === 'red' ? '2020' : 'red') })), body,
-      el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary written for Night City Table. For full rules, open your rulebook in the Books tab. Your DM\'s ruling always wins.' }));
+    m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q,
+        isGM() ? el('button', { class: 'small pink', text: '✏ Edit rules', title: 'Change these rules for your game (players see your version)', onclick: () => openQuickRef(line, true) }) : null,
+        el('button', { class: 'small', text: line === 'red' ? 'Switch to 2020' : 'Switch to RED', onclick: () => openQuickRef(line === 'red' ? '2020' : 'red') })), body,
+      el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: custom ? "These are your DM's house rules for this game." : 'A short summary written for Night City Table. For full rules, open your rulebook in the Books tab. Your DM\'s ruling always wins.' }));
+  }
+  function editQuickRef(m, line) {
+    const work = rulesFor(line).map(([t, ls]) => [t, ls.slice()]);
+    const body = el('div', { class: 'col', style: 'gap:10px' });
+    const draw = () => {
+      body.textContent = '';
+      work.forEach((sec, i) => {
+        const title = el('input', { class: 'grow', value: sec[0], placeholder: 'Section title', oninput: e => { sec[0] = e.target.value; } });
+        const ta = el('textarea', { style: 'width:100%;min-height:' + Math.min(260, 40 + sec[1].length * 38) + 'px;line-height:1.45', value: sec[1].join('\n'), placeholder: 'One rule per line', oninput: e => { sec[1] = e.target.value.split('\n'); } });
+        body.append(el('div', { style: 'border:1px solid var(--line);padding:8px' },
+          el('div', { class: 'row', style: 'margin-bottom:6px' }, title,
+            el('button', { class: 'small ghost', text: '↑', title: 'Move up', disabled: i === 0, onclick: () => { work.splice(i - 1, 0, work.splice(i, 1)[0]); draw(); } }),
+            el('button', { class: 'small ghost', text: '↓', title: 'Move down', disabled: i === work.length - 1, onclick: () => { work.splice(i + 1, 0, work.splice(i, 1)[0]); draw(); } }),
+            el('button', { class: 'small danger', text: '✕', title: 'Delete this section', onclick: () => askConfirm('Delete this section?', '"' + (sec[0] || 'untitled') + '" and its rules will be removed when you save.', 'Delete', () => { work.splice(i, 1); draw(); }) })),
+          ta));
+      });
+    };
+    const save = () => { request({ type: 'rules.set', line, sections: work.map(([t, ls]) => [t.trim(), ls.map(x => x.trim()).filter(Boolean)]).filter(x => x[1].length) }); toast('House rules saved. Players see your version.'); setTimeout(() => openQuickRef(line), 150); };
+    m.append(el('p', { class: 'dim', text: 'Change, add or remove anything. Each line in a box is one rule. Players see your version in this game.' }), body,
+      el('div', { class: 'row', style: 'margin-top:12px;flex-wrap:wrap' },
+        el('button', { text: '+ Add section', onclick: () => { work.push(['New rules', ['']]); draw(); setTimeout(() => { const ins = body.querySelectorAll('input'); ins[ins.length - 1].select(); }, 0); } }),
+        el('button', { class: 'ghost', text: '↺ Reset to original', onclick: () => askConfirm('Go back to the original rules?', 'Your house rules for this game will be replaced with the original quick reference.', 'Reset', () => { request({ type: 'rules.set', line, sections: null }); toast('Back to the original rules'); setTimeout(() => openQuickRef(line), 150); }) }),
+        el('div', { class: 'grow' }),
+        el('button', { class: 'ghost', text: 'Cancel', onclick: () => openQuickRef(line) }),
+        el('button', { class: 'primary', text: '✓ Save house rules', onclick: save })));
+    draw();
   }
 
   // ================= TOKEN SIZE & AMMO TRACKER =================

@@ -212,6 +212,7 @@
       case 'sheet.delete': delete state.sheets[op.id]; for (const mid in state.maps) for (const tid in state.maps[mid].tokens) if (state.maps[mid].tokens[tid].sheetId === op.id) state.maps[mid].tokens[tid].sheetId = null; break;
       case 'init.set': state.init = op.init; break;
       case 'web.allow': state.allowWeb = !!op.on; break;
+      case 'rules.set': state.houseRules = state.houseRules || {}; if (op.sections) state.houseRules[op.line] = op.sections; else delete state.houseRules[op.line]; break;
       case 'journal.folder.upsert': upgrade(state); state.journal.folders[op.folder.id] = op.folder; break;
       case 'journal.folder.delete': upgrade(state); delete state.journal.folders[op.id]; for (const id in state.journal.entries) if (state.journal.entries[id].folderId === op.id) state.journal.entries[id].folderId = null; break;
       case 'journal.entry.upsert': upgrade(state); state.journal.entries[op.entry.id] = op.entry; break;
@@ -568,6 +569,12 @@
         const s = state.sheets[req.id]; if (!s) return out;
         if (!isGM && s.ownerId !== sender.id) return deny();
         out.ops.push({ type: 'sheet.delete', id: req.id }); return out;
+      }
+      case 'rules.set': { // DM's own version of the quick rules (house rules); null = back to the original
+        if (!isGM) return deny('Only the DM can change the rules');
+        const line = req.line === 'red' ? 'red' : '2020';
+        const sections = Array.isArray(req.sections) ? req.sections.slice(0, 80).map(x => [str(x && x[0], 80) || 'Rules', (Array.isArray(x && x[1]) ? x[1] : []).slice(0, 60).map(l => str(l, 1500)).filter(l => l.trim())]).filter(x => x[1].length) : null;
+        out.ops.push({ type: 'rules.set', line, sections }); return out;
       }
       case 'web.allow': { if (!isGM) return deny('Only the DM can change this'); out.ops.push({ type: 'web.allow', on: !!req.on }); return out; }
       case 'init.set': {
