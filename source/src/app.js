@@ -172,7 +172,7 @@
     peer.on('open', () => clientConnect());
     peer.on('error', e => {
       if (net.peer !== peer || net.closing) return;
-      if (e.type === 'peer-unavailable') { setNet('off', "DM isn't online, waiting…"); if (!S) hint("The DM's game isn't running right now.\nAsk your DM to open the game. This page will connect by itself when they do."); scheduleRejoin(); }
+      if (e.type === 'peer-unavailable') { setNet('off', "No game with code " + joinCode + " is open right now"); if (!S) hint("No game with code " + joinCode + " is open right now.\nCheck the code with your DM, and ask them to open the game.\nThis keeps trying by itself."); scheduleRejoin(); }
       else if (['network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)) { setNet('warn', 'Connection problem, retrying…'); scheduleRejoin(true); }
     });
     peer.on('disconnected', () => { if (net.closing || net.peer !== peer) return; try { peer.reconnect(); } catch (e) { } });
@@ -190,8 +190,10 @@
     try { net.conn && net.conn.close(); } catch (e) { }
     const conn = net.peer.connect(PEER_PREFIX + joinCode, { reliable: true });
     net.conn = conn;
-    const t = setTimeout(() => { if (!conn.open && net.conn === conn) { setNet('off', "DM isn't online, waiting…"); scheduleRejoin(); } }, 9000);
-    conn.on('open', () => { clearTimeout(t); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color, web: !DESKTOP }); });
+    // some networks need a relay and take a while to connect, so wait up to 30 s before trying again
+    const slow = setTimeout(() => { if (!conn.open && net.conn === conn) setNet('warn', 'Still connecting… (some networks take up to 30 seconds)'); }, 8000);
+    const t = setTimeout(() => { if (!conn.open && net.conn === conn) { setNet('off', "Can't reach the DM. Check the code, and that the DM's game is open. Retrying…"); if (!S) hint("Can't reach the DM's game yet.\nCheck the game code (" + joinCode + ") is right, and that the DM has the game open.\nThis keeps trying by itself."); scheduleRejoin(); } }, 30000);
+    conn.on('open', () => { clearTimeout(t); clearTimeout(slow); conn.send({ t: 'hello', id: me.id, name: me.name, color: me.color, web: !DESKTOP }); });
     conn.on('data', clientRecv);
     conn.on('close', () => { if (net.conn !== conn || net.closing) return; setNet('warn', 'Lost the DM, reconnecting…'); scheduleRejoin(); });
   }
@@ -264,7 +266,14 @@
       el('button', { class: 'small pink', text: 'Rejoin', onclick: () => { if (!needName()) joinGame(j.code); } }),
       el('button', { class: 'small ghost', text: '✕', title: 'Forget', onclick: () => { LS.set('nct-joins', LS.get('nct-joins', []).filter(x => x.code !== j.code)); renderRecentJoins(); } })));
   }
-  function parseJoin(v) { v = String(v || '').trim(); const m = v.match(/join=([A-Za-z0-9]+)/); return m ? m[1] : v; }
+  // accepts a code, an invite link, or the whole invite message pasted in
+  function parseJoin(v) {
+    v = String(v || '').trim();
+    let m = v.match(/join=([A-Za-z0-9]+)/) || v.match(/code[^A-Za-z0-9]{0,3}([A-Za-z0-9]{4,12})/i);
+    if (m) return m[1];
+    if (/\s/.test(v)) { const t = v.match(/\b[A-HJ-NP-Z2-9]{6}\b/); if (t) return t[0]; }
+    return v;
+  }
   function downloadJSON(obj, name) { const b = new Blob([JSON.stringify(obj)], { type: 'application/json' }); const a = el('a', { href: URL.createObjectURL(b), download: name }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
 
   $('#myName').addEventListener('change', saveIdentity); $('#myColor').addEventListener('change', saveIdentity);
@@ -548,11 +557,13 @@
     if (drag && drag.id === t.id) { x = drag.x; y = drag.y; }
     const cx = x + p / 2, cy = y + p / 2, r = p / 2 - 2 / v.z;
     const sh = t.sheetId && S.sheets[t.sheetId];
-    const img = getImg(t.img || (sh && sh.portrait));
+    const face = t.face > 0 && t.faces && t.faces[t.face - 1];
+    const img = getImg((face && face.img) || t.img || (sh && sh.portrait));
+    const rot = (t.rot || 0) * Math.PI / 180;
     ctx.save(); if (t.hidden) ctx.globalAlpha = 0.45;
     ctx.shadowColor = t.color; ctx.shadowBlur = 12;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = '#0b0f1a'; ctx.fill(); ctx.shadowBlur = 0;
-    if (img) { ctx.save(); ctx.clip(); const s = Math.max(p / img.naturalWidth, p / img.naturalHeight); const iw = img.naturalWidth * s, ih = img.naturalHeight * s; ctx.drawImage(img, cx - iw / 2, cy - ih / 2, iw, ih); ctx.restore(); }
+    if (img) { ctx.save(); ctx.clip(); ctx.translate(cx, cy); ctx.rotate(rot); if (t.flip) ctx.scale(-1, 1); const s = Math.max(p / img.naturalWidth, p / img.naturalHeight); const iw = img.naturalWidth * s, ih = img.naturalHeight * s; ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih); ctx.restore(); }
     else {
       ctx.fillStyle = t.color + '55'; ctx.fill();
       ctx.fillStyle = '#fff'; ctx.font = '700 ' + (p * 0.38) + 'px "Courier New", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -560,6 +571,16 @@
     }
     ctx.lineWidth = Math.max(2 / v.z, p * 0.05); ctx.strokeStyle = t.color; if (t.hidden) ctx.setLineDash([6 / v.z, 4 / v.z]);
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    if (t.rot) { // facing marker: a small arrow on the ring (0° = up)
+      const a = rot - Math.PI / 2, tip = r + Math.max(7 / v.z, p * 0.12), base = r - 1 / v.z, w = 0.22;
+      ctx.fillStyle = t.color; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * tip, cy + Math.sin(a) * tip); ctx.lineTo(cx + Math.cos(a - w) * base, cy + Math.sin(a - w) * base); ctx.lineTo(cx + Math.cos(a + w) * base, cy + Math.sin(a + w) * base); ctx.closePath(); ctx.fill();
+    }
+    if (t.conds && t.conds.length) { // condition badges around the top-right
+      const bs = Math.max(13 / v.z, p * 0.26); ctx.font = (bs * 0.72) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      t.conds.slice(0, 8).forEach((k, i) => { const c = N.CONDITIONS.find(x => x[0] === k); if (!c) return; const ang = -Math.PI / 2 + 0.5 + i * 0.62, bx = cx + Math.cos(ang) * (r + bs * 0.15), by = cy + Math.sin(ang) * (r + bs * 0.15);
+        ctx.fillStyle = '#000d'; ctx.beginPath(); ctx.arc(bx, by, bs / 2, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = k === 'dead' ? '#ff4d4d' : TH.s; ctx.lineWidth = 1.5 / v.z; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.fillText(c[2], bx, by + bs * 0.04); });
+      if (t.conds.includes('dead')) { ctx.strokeStyle = '#ff4d4dcc'; ctx.lineWidth = Math.max(3 / v.z, p * 0.06); ctx.beginPath(); ctx.moveTo(cx - r * 0.6, cy - r * 0.6); ctx.lineTo(cx + r * 0.6, cy + r * 0.6); ctx.moveTo(cx + r * 0.6, cy - r * 0.6); ctx.lineTo(cx - r * 0.6, cy + r * 0.6); ctx.stroke(); }
+    }
     if (selected === t.id) { ctx.strokeStyle = TH.t; ctx.lineWidth = 2 / v.z; ctx.beginPath(); ctx.arc(cx, cy, r + 5 / v.z, 0, Math.PI * 2); ctx.stroke(); }
     if (sh && sh.damage > 0) {
       const bw = p * 0.9, bh = Math.max(4 / v.z, p * 0.08), k = Math.min(1, sh.damage / 40);
@@ -667,6 +688,10 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); closeModal(); closeCtx(); $$('.popover').forEach(p => p.remove()); return; }
     if (e.target.matches('input,textarea,select')) return;
+    if (['q', 'e', 'f'].includes(e.key.toLowerCase()) && !e.ctrlKey && !e.metaKey && selected && activeMap()) {
+      const t = activeMap().tokens[selected]; if (t && canMoveToken(t)) { const k = e.key.toLowerCase(); const step = e.shiftKey ? 15 : 45;
+        request({ type: 'token.update', mapId: activeMap().id, id: t.id, patch: k === 'f' ? { flip: !t.flip } : { rot: (t.rot || 0) + (k === 'q' ? -step : step) } }); } return;
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected && activeMap()) { const t = activeMap().tokens[selected]; if (t && canMoveToken(t)) { request({ type: 'token.delete', mapId: activeMap().id, id: t.id }); selected = null; } }
   });
 
@@ -684,7 +709,11 @@
       items.push(['Size… (now ' + t.size + ')', () => openTokenSize(t)]);
       items.push(['Bigger', () => upd({ size: Math.min(10, t.size + (t.size < 1 ? 0.25 : 1)) })]);
       items.push(['Smaller', () => upd({ size: Math.max(0.25, t.size - (t.size <= 1 ? 0.25 : 1)) })]);
+      items.push(['↻ Turn / flip…', () => openTurn(t)]);
+      items.push(['🎭 Faces / transform…' + (t.faces && t.faces.length ? ' (' + (t.face ? t.faces[t.face - 1].name : 'normal') + ')' : ''), () => openFaces(t)]);
+      items.push(['🏷 Conditions…' + (t.conds && t.conds.length ? ' (' + t.conds.length + ')' : ''), () => openConditions(t)]);
       items.push(['Change picture…', () => pickImage(256, url => upd({ img: url }))]);
+      items.push(['🪙 Make a token picture…', () => openTokenMaker(url => upd({ img: url }))]);
       items.push(['Change colour…', () => { const i = el('input', { type: 'color', value: t.color }); i.onchange = () => upd({ color: i.value }); i.click(); }]);
     }
     if (isGM()) {
@@ -831,7 +860,7 @@
     box.append(el('div', { class: 'row' },
       el('button', { class: 'primary grow', text: '+ New character', onclick: () => newSheet(false) }),
       el('button', { class: 'pink grow', text: '⇩ Import', title: 'Import from cyberpunk2020character.com', onclick: openImportHelp })));
-    if (isGM()) box.append(el('button', { text: '+ New NPC (only you can edit)', onclick: () => newSheet(true) }));
+    if (isGM()) box.append(el('button', { text: '+ New NPC (only you can edit)', onclick: () => newSheet(true) }), el('button', { class: 'pink', text: '📚 NPC library (premade enemies)', onclick: openNpcLibrary }));
     const list = Object.values(S.sheets).sort((a, b) => ((b.ownerId === me.id) - (a.ownerId === me.id)) || a.name.localeCompare(b.name));
     if (!list.length) box.append(el('p', { class: 'dim', text: "No characters yet. Make one, or click Import to bring yours over from cyberpunk2020character.com." }));
     for (const s of list) {
@@ -893,7 +922,8 @@
     const roleSel = el('select', { disabled: !ed, onchange: change(v => { s.role = v; }) }, ...Object.entries(N.ROLES).map(([k, r]) => el('option', { value: k, text: r.label, selected: k === s.role })), N.ROLES[s.role] ? null : el('option', { value: s.role, text: s.role, selected: true }));
     const wound = N.woundInfo(s.damage);
     const wallet = (label, body, color, sub) => el('div', { class: 'wallet', style: '--wc:' + color }, el('div', { class: 'wl', text: label }), body, sub ? el('div', { class: 'ws', text: sub }) : null);
-    const head = el('div', { class: 'dossier full' }, portrait,
+    const portraitBox = ed ? el('div', { class: 'col', style: 'gap:4px;align-items:center' }, portrait, el('button', { class: 'small ghost', text: '🪙 Token maker', title: 'Make a round token picture for this character', onclick: () => openTokenMaker(u => { s.portrait = u; saveSheetSoon(); renderSheetModal(false); }, { src: s.portrait || '' }) })) : portrait;
+    const head = el('div', { class: 'dossier full' }, portraitBox,
       el('div', { class: 'col grow', style: 'min-width:240px' },
         el('div', { class: 'dlabel', text: '▮▮ CHARACTER DOSSIER ▮▮' }),
         inp(s.name, v => { s.name = v; }, { class: 'dname', placeholder: 'Name' }),

@@ -223,12 +223,20 @@
     return state;
   }
 
+  // conditions a token can show (key, label, badge)
+  const CONDITIONS = [['stunned', 'Stunned', '💫'], ['prone', 'Prone', '⬇'], ['bleeding', 'Bleeding', '🩸'], ['unconscious', 'Unconscious', '💤'], ['dead', 'Dead', '☠'], ['fire', 'On fire', '🔥'],
+    ['grappled', 'Grappled', '✊'], ['aiming', 'Aiming', '🎯'], ['hidden', 'Hidden', '🙈'], ['cover', 'In cover', '🛡'], ['poisoned', 'Poisoned', '☣'], ['blinded', 'Blinded', '🕶'],
+    ['slowed', 'Slowed', '🐌'], ['shocked', 'Shocked', '⚡'], ['marked', 'Marked', '❗'], ['jacked', 'Jacked in', '🔌']];
+  const COND_KEYS = CONDITIONS.map(c => c[0]);
+  function cleanFaces(f) { return (Array.isArray(f) ? f : []).filter(x => x && isImg(x.img) && String(x.img).length <= 600000).slice(0, 8).map(x => ({ name: str(x.name || 'Face', 40), img: x.img })); }
+  function cleanConds(c) { return [...new Set((Array.isArray(c) ? c : []).filter(k => COND_KEYS.includes(k)))]; }
+  function tokenLook(t) { return { rot: ((Math.round(Number(t.rot) || 0) % 360) + 360) % 360, flip: !!t.flip, faces: cleanFaces(t.faces), face: clamp(t.face || 0, 0, 8), conds: cleanConds(t.conds) }; }
   function sanitizeToken(t, ownerId) {
-    return {
+    return Object.assign(tokenLook(t), {
       id: str(t.id || uid(), 20), x: clamp(t.x, -100000, 100000), y: clamp(t.y, -100000, 100000), size: clamp(t.size || 1, 0.25, 10),
       name: str(t.name, 60), color: /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : '#05d9e8', img: isImg(t.img) ? t.img : '',
       sheetId: t.sheetId ? str(t.sheetId, 20) : null, hidden: !!t.hidden, ownerId: ownerId === undefined ? (t.ownerId || null) : ownerId
-    };
+    });
   }
   function sanitizeSheet(s) {
     const b = blankSheet(s.ownerId);
@@ -373,14 +381,16 @@
       if (target) {
         let sp = (Number(target.sp[loc]) || 0) + cover; if (ap) sp = Math.floor(sp / 2);
         let through = Math.max(0, dmg - sp);
-        if (through > 0 && loc === 'head') through *= 2;
         const btm = derived(target).btm;
+        const undoubled = through > 0 ? Math.max(1, through + btm) : 0; // what the hit does before the head doubling
+        if (through > 0 && loc === 'head') through *= 2;
         const wounds = through > 0 ? Math.max(1, through + btm) : 0;
         if (wounds > 0 && (Number(target.sp[loc]) || 0) > 0) { target.sp[loc] -= 1; d.wear = true; }
         target.damage = Math.min(41, target.damage + wounds); totalWounds += wounds;
         Object.assign(d, { sp, through, btm, wounds });
-        if (wounds >= 8 && loc === 'head') { d.note = 'Head hit of 8+: killed outright'; target.damage = 41; }
-        else if (wounds >= 8 && loc !== 'torso') d.note = 'Limb hit of 8+: severed or crushed (Mortal 0)';
+        // 2020: a head hit doing 8+ (before doubling) kills; a limb taking more than 8 in one hit is lost (death save at Mortal 0)
+        if (undoubled >= 8 && loc === 'head') { d.note = 'Head hit of 8+ (before doubling): killed outright'; target.damage = 41; }
+        else if (wounds > 8 && loc !== 'torso' && loc !== 'head') d.note = 'Limb took more than 8: severed or crushed. Death save at Mortal 0';
       }
       hitDetail.push(d);
       lines.push('Hit ' + (h + 1) + ' · ' + locName(loc) + ': ' + d.text + (target ? '  − SP ' + d.sp + (ap ? ' (AP)' : '') + (d.through > 0 && loc === 'head' ? ' → ×2 head' : '') + ' − BTM ' + (-d.btm) + ' = ' + d.wounds + ' wound' + (d.wounds === 1 ? '' : 's') + (d.wear ? ' (armor −1 SP)' : '') : '') + (d.note ? '  ⚠ ' + d.note : ''));
@@ -514,6 +524,12 @@
         if (q.name !== undefined) p.name = str(q.name, 60);
         if (q.color !== undefined && /^#[0-9a-f]{6}$/i.test(q.color)) p.color = q.color;
         if (q.img !== undefined) p.img = isImg(q.img) ? q.img : '';
+        // facing, mirror, transformation faces and condition markers: the token's owner or the DM
+        if (q.rot !== undefined) p.rot = ((Math.round(Number(q.rot) || 0) % 360) + 360) % 360;
+        if (q.flip !== undefined) p.flip = !!q.flip;
+        if (q.faces !== undefined) p.faces = cleanFaces(q.faces);
+        if (q.face !== undefined) p.face = clamp(q.face, 0, 8);
+        if (q.conds !== undefined) p.conds = cleanConds(q.conds);
         if (isGM) { if (q.hidden !== undefined) p.hidden = !!q.hidden; if (q.sheetId !== undefined) { p.sheetId = q.sheetId && state.sheets[q.sheetId] ? q.sheetId : null; p.ownerId = p.sheetId ? (state.sheets[p.sheetId].ownerId || null) : null; } }
         const moving = (p.x !== undefined && p.x !== t.x) || (p.y !== undefined && p.y !== t.y);
         if (moving && combatOn(state) && t.sheetId && state.sheets[t.sheetId]) {
@@ -539,7 +555,7 @@
         const s = req.sheet || {}; const existing = s.id && state.sheets[s.id];
         if (existing && !isGM && existing.ownerId !== sender.id) return deny('Not your character');
         const clean = sanitizeSheet(s);
-        if (!existing) clean.id = uid();
+        if (!existing) clean.id = isGM && /^[\w-]{6,20}$/.test(String(s.id || '')) ? String(s.id) : uid(); // the DM may pick the id (NPC library places tokens linked to it)
         if (!isGM) clean.ownerId = sender.id;
         else if (s.ownerId !== undefined) clean.ownerId = s.ownerId && state.players[s.ownerId] ? s.ownerId : null;
         else if (existing) clean.ownerId = existing.ownerId;
@@ -747,5 +763,5 @@
   }
 
   root.NCT = { uid, code, clone, roll, rollToText, STATS, SKILLS_BY_STAT, SKILL_STAT, ROLES, LOCS, weaponSkill, blankSheet, statVal, effStat, derived, woundInfo, skillTotal,
-    DEFAULT_MODS, strBonus, cleanModValue, RANGE_BANDS, COVER, UNARMED, isMeleeWeapon, weaponRange, rangeBand, tokenDistance, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
+    DEFAULT_MODS, CONDITIONS, strBonus, cleanModValue, RANGE_BANDS, COVER, UNARMED, isMeleeWeapon, weaponRange, rangeBand, tokenDistance, newCampaign, newMap, upgrade, apply, combatOn, tokenRun, moveMetres, movedThisRound, isTokensTurn, canSeeEntry, journalView, journalDiff, handleRequest, viewFor, canSeeMsg, opsFor, sanitizeSheet, sanitizeToken, fromCP2020Site, isImg };
 })(typeof window !== 'undefined' ? window : globalThis);

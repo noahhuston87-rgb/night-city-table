@@ -630,6 +630,7 @@
     q.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
     box.append(el('div', { class: 'section-h', text: 'Rules quick reference' }),
       el('div', { class: 'row' }, el('button', { class: 'primary grow', text: 'Cyberpunk 2020', onclick: () => openQuickRef('2020') }), el('button', { class: 'primary grow', text: 'Cyberpunk RED', onclick: () => openQuickRef('red') })),
+      isGM() ? el('button', { class: 'pink', style: 'width:100%;margin-top:6px', text: '🗓 Lore timeline (DM only)', onclick: openTimeline }) : null,
       el('div', { class: 'section-h', text: 'Search' }), el('div', { class: 'row' }, q, el('button', { text: 'Go', onclick: doSearch })), results,
       el('div', { class: 'section-h', text: 'My books' }));
     const books = bookList();
@@ -704,7 +705,7 @@
       ['Unarmed', ['Punch or strike 1d6 ÷ 2 · Kick 1d6. Add the strength damage bonus. Martial Arts adds its skill level to the damage.']],
       ['Melee', ['Attacker: 1d10 + REF + melee skill. Defender: 1d10 + REF + Dodge & Escape (or their melee skill). Higher wins.', 'Strength damage bonus by BODY: 2 → −2 · 3-4 → −1 · 5-7 → 0 · 8-9 → +1 · 10 → +2 · 11-12 → +4 · 13-14 → +6 · 15+ → +8.']],
       ['Hit location (1d10)', ['1 Head · 2-4 Torso · 5 Right arm · 6 Left arm · 7-8 Right leg · 9-10 Left leg.']],
-      ['Damage, step by step', ['1. Roll weapon damage.', '2. Subtract the armor SP at the hit location.', '3. Head hit: double what got through.', '4. Subtract the Body Type Modifier (BTM). If anything got past the armor, at least 1 point still lands.', '5. Mark it on the wound track. Armor that was beaten loses 1 SP.', '8+ points to a limb after armor: the limb is severed or crushed (Mortal 0). 8+ to the head kills outright.']],
+      ['Damage, step by step', ['1. Roll weapon damage.', '2. Subtract the armor SP at the hit location.', '3. Head hit: double what got through.', '4. Subtract the Body Type Modifier (BTM). If anything got past the armor, at least 1 point still lands.', '5. Mark it on the wound track. Armor that was beaten loses 1 SP.', 'More than 8 points to a limb in one hit: the limb is lost, and the character makes a death save at Mortal 0. A head hit doing 8 or more before doubling kills outright.']],
       ['Wounds', ['4 boxes per level. Light (1-4): no penalty. Serious (5-8): REF −2. Critical (9-12): REF, INT and COOL halved.', 'Mortal 0-6 (13-40): REF, INT and COOL ÷3, and you make a death save every turn. 41+: dead.']],
       ['Saves', ['Stun/Shock save (whenever you take damage): roll 1d10, you need BODY or less. Subtract the wound penalty first: Serious −1, Critical −2, Mortal 0 −3, and so on. Fail and you are out of the fight.', 'Death save (when mortally wounded, every turn): 1d10, you need BODY minus your Mortal level or less. Fail and you die.']],
       ['Body type', ['BTM by BODY: 2 → 0 · 3-4 → −1 · 5-7 → −2 · 8-9 → −3 · 10 → −4 · 11+ → −5.', 'Run = MA × 3 metres per turn. Leap = Run ÷ 4. Lift = BODY × 40 kg.']],
@@ -718,7 +719,7 @@
       ['Damage', ['Roll the weapon\'s dice and subtract the SP of the head or body armor. What gets through comes off Hit Points.', 'Armor that is beaten loses 1 SP (ablation).', 'Two or more 6s on the damage dice is a Critical Injury: 5 extra damage that ignores armor, plus an injury from the table.']],
       ['Weapon damage by type', ['Medium pistol 2d6 · Heavy pistol 3d6 · Very heavy pistol 4d6 · SMG 2d6 · Heavy SMG 3d6.', 'Shotgun 5d6 · Assault rifle 5d6 · Sniper rifle 5d6 · Bow or crossbow 4d6 · Grenade launcher 6d6 · Rocket launcher 8d6.', 'Melee: light 1d6 · medium 2d6 · heavy 3d6 · very heavy 4d6.']],
       ['Armor (SP)', ['Leathers 4 · Kevlar 7 · Light armorjack 11 · Bodyweight suit 11 · Medium armorjack 12 · Heavy armorjack 13 · Flak 15 · Metalgear 18.']],
-      ['Hit Points & wounds', ['HP = 10 + 5 × (BODY + WILL ÷ 2, rounded up).', 'Seriously Wounded (under half HP): −2 to all actions.', 'Mortally Wounded (under 1 HP): −4 to all actions and a death save every turn. Roll 1d10 and you must get under your BODY. Each save makes the next one harder.']],
+      ['Hit Points & wounds', ['HP = 10 + 5 × ((BODY + WILL) ÷ 2, rounded up).', 'Seriously Wounded (under half HP): −2 to all actions.', 'Mortally Wounded (under 1 HP): −4 to all actions, −6 MOVE, and a death save at the start of every turn. Roll 1d10 and you must get under your BODY. Each save makes the next one harder.']],
       ['Humanity & cyberware', ['Humanity = EMP × 10. Installing cyberware costs Humanity Loss.', 'EMP drops 1 for every full 10 Humanity lost. Run out and you are a cyberpsycho.']]
     ]
   };
@@ -904,4 +905,286 @@
         c.crit ? el('span', { class: 'badge b-crit', text: 'CRITICAL!' }) : null, c.fumble ? el('span', { class: 'badge b-fum', text: 'FUMBLE' }) : null),
       el('div', { class: 'brk', style: 'white-space:pre-wrap', text: c.lines.join('\n') }));
     return d;
+  }
+
+  // ================= RIGHT-CLICK: only the game's own menus =================
+  // (text boxes keep the normal copy / paste menu)
+  document.addEventListener('contextmenu', e => { if (!(e.target.closest && e.target.closest('input,textarea,[contenteditable="true"]'))) e.preventDefault(); });
+
+  // ================= TOKEN: TURN / FLIP =================
+  function tokenNow(t) { const m = activeMap(); return m && m.tokens[t.id]; }
+  function updTok(t, patch) { const m = activeMap(); if (m) request({ type: 'token.update', mapId: m.id, id: t.id, patch }); }
+  function openTurn(t0) {
+    const m = modal('Turn / flip: ' + (t0.name || 'token'));
+    const dirs = [['↖', 315], ['↑', 0], ['↗', 45], ['←', 270], ['', null], ['→', 90], ['↙', 225], ['↓', 180], ['↘', 135]];
+    const slider = el('input', { type: 'range', min: 0, max: 359, step: 1, value: t0.rot || 0, class: 'grow' });
+    const deg = el('span', { class: 'mono', style: 'width:48px', text: (t0.rot || 0) + '°' });
+    const set = rot => { slider.value = rot; deg.textContent = rot + '°'; updTok(t0, { rot }); };
+    slider.oninput = () => { deg.textContent = slider.value + '°'; };
+    slider.onchange = () => set(Number(slider.value));
+    m.append(el('p', { class: 'dim', text: 'Point the token the way it faces. Tip: select a token and press Q / E to turn it 45° (hold Shift for 15°), F to flip.' }),
+      el('div', { class: 'turngrid' }, ...dirs.map(([a, r]) => r === null ? el('div', { class: 'turnc', text: '◎' }) : el('button', { class: 'turnb', text: a, title: r + '°', onclick: () => set(r) }))),
+      el('div', { class: 'row', style: 'margin-top:10px' }, el('label', { text: 'Exact' }), slider, deg),
+      el('div', { class: 'row', style: 'margin-top:10px' },
+        el('button', { text: '⟲ 45°', onclick: () => set((((tokenNow(t0) || t0).rot || 0) + 315) % 360) }),
+        el('button', { text: '⟳ 45°', onclick: () => set((((tokenNow(t0) || t0).rot || 0) + 45) % 360) }),
+        el('button', { class: 'pink', text: '⇋ Flip (mirror)', onclick: () => updTok(t0, { flip: !(tokenNow(t0) || t0).flip }) }),
+        el('div', { class: 'grow' }),
+        el('button', { class: 'ghost', text: 'Reset', onclick: () => { set(0); updTok(t0, { flip: false }); } })));
+  }
+
+  // ================= TOKEN: FACES (transformations) =================
+  function openFaces(t0) {
+    const m = modal('Faces / transform: ' + (t0.name || 'token'), true);
+    const list = el('div', { class: 'faces' });
+    const sh = t0.sheetId && S.sheets[t0.sheetId];
+    const draw = () => {
+      const t = tokenNow(t0) || t0; const faces = t.faces || []; list.textContent = '';
+      const card = (img, name, idx) => el('div', { class: 'facecard' + ((t.face || 0) === idx ? ' on' : ''), title: 'Switch to ' + name, onclick: () => { updTok(t, { face: idx }); setTimeout(draw, 80); } },
+        img ? el('img', { src: img }) : el('div', { class: 'faceblank', text: (t.name || '?').slice(0, 2).toUpperCase() }), el('div', { class: 'fn', text: name }),
+        idx > 0 ? el('button', { class: 'small ghost fx', text: '✕', title: 'Remove this face', onclick: e => { e.stopPropagation(); const nf = faces.filter((_, i) => i !== idx - 1); updTok(t, { faces: nf, face: (t.face === idx ? 0 : t.face > idx ? t.face - 1 : t.face) }); setTimeout(draw, 80); } }) : null);
+      list.append(card(t.img || (sh && sh.portrait) || '', 'Normal', 0));
+      faces.forEach((f, i) => list.append(card(f.img, f.name, i + 1)));
+    };
+    const addFace = url => { const t = tokenNow(t0) || t0; const faces = (t.faces || []).slice(); if (faces.length >= 8) return toast('A token can have up to 8 extra faces', true);
+      askText('Name this face (e.g. "Combat mode", "Wolf form")', 'Face ' + (faces.length + 1), name => { faces.push({ name: name || 'Face', img: url }); updTok(t, { faces, face: faces.length }); setTimeout(() => openFaces(t0), 120); }); };
+    m.append(el('p', { class: 'dim', text: 'Give this token extra looks for transformations, disguises or cyber-modes. Click a face to switch to it; everyone sees the change.' }), list,
+      el('div', { class: 'row', style: 'margin-top:12px' },
+        el('button', { class: 'primary', text: '+ Add face from a picture…', onclick: () => pickImage(320, url => addFace(url)) }),
+        el('button', { class: 'pink', text: '🪙 Make one in the token maker…', onclick: () => openTokenMaker(url => addFace(url)) })));
+    draw();
+  }
+
+  // ================= TOKEN: CONDITIONS =================
+  function openConditions(t0) {
+    const m = modal('Conditions: ' + (t0.name || 'token'));
+    const box = el('div', { class: 'condgrid' });
+    const draw = () => {
+      const t = tokenNow(t0) || t0; const on = new Set(t.conds || []); box.textContent = '';
+      for (const [k, label, icon] of N.CONDITIONS) box.append(el('button', { class: 'cond' + (on.has(k) ? ' on' : ''), onclick: () => { const n = new Set((tokenNow(t0) || t0).conds || []); n.has(k) ? n.delete(k) : n.add(k); updTok(t0, { conds: [...n] }); setTimeout(draw, 80); } },
+        el('span', { class: 'ci', text: icon }), label));
+    };
+    m.append(el('p', { class: 'dim', text: 'Markers show as badges on the token for everyone.' }), box,
+      el('div', { class: 'row', style: 'margin-top:10px' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Clear all', onclick: () => { updTok(t0, { conds: [] }); setTimeout(draw, 80); } })));
+    draw();
+  }
+
+  // ================= TOKEN MAKER (TokenStamp-style) =================
+  function openTokenMaker(onDone, opts) {
+    opts = opts || {};
+    const OUT = 320, P = 400; // saved size, preview size
+    const m = modal('🪙 Token maker', true);
+    const cv2 = el('canvas', { width: P, height: P, class: 'tm-canvas', title: 'Drag to move the picture, scroll (or pinch) to zoom' });
+    const g = cv2.getContext('2d');
+    const st = Object.assign({ img: null, x: 0, y: 0, z: 1, rot: 0, shape: 'circle', border: 'neon', color: LS.get('nct-tm-color', '#05d9e8'), color2: LS.get('nct-tm-color2', '#ff2a6d'), width: 10, bg: '#0b0f1a' }, LS.get('nct-tm', {}), { img: null });
+    const SHAPES = [['circle', '● Circle'], ['square', '■ Square'], ['hex', '⬢ Hex']];
+    const BORDERS = [['neon', 'Neon glow'], ['solid', 'Solid'], ['double', 'Double ring'], ['tech', 'Tech segments'], ['notch', 'Corner brackets'], ['none', 'No border']];
+    function path(c, cx, cy, r) {
+      c.beginPath();
+      if (st.shape === 'circle') c.arc(cx, cy, r, 0, Math.PI * 2);
+      else if (st.shape === 'square') { const k = r * 0.12; c.roundRect ? c.roundRect(cx - r, cy - r, 2 * r, 2 * r, k) : c.rect(cx - r, cy - r, 2 * r, 2 * r); }
+      else { for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; c[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r); } c.closePath(); }
+    }
+    function render(c, S2) {
+      const k = S2 / P, cx = S2 / 2, cy = S2 / 2, bw = st.border === 'none' ? 0 : st.width * k, r = S2 / 2 - bw / 2 - (st.border === 'neon' ? 10 * k : 2 * k);
+      c.clearRect(0, 0, S2, S2);
+      c.save(); path(c, cx, cy, r); c.fillStyle = st.bg; c.fill(); c.clip();
+      if (st.img) { c.translate(cx + st.x * k, cy + st.y * k); c.rotate(st.rot * Math.PI / 180); const base = Math.max((2 * r) / st.img.naturalWidth, (2 * r) / st.img.naturalHeight) * st.z; c.drawImage(st.img, -st.img.naturalWidth * base / 2, -st.img.naturalHeight * base / 2, st.img.naturalWidth * base, st.img.naturalHeight * base); }
+      c.restore();
+      if (!bw) return;
+      c.save(); c.lineWidth = bw; c.strokeStyle = st.color; c.lineJoin = 'round';
+      if (st.border === 'neon') { c.shadowColor = st.color; c.shadowBlur = 14 * k; path(c, cx, cy, r); c.stroke(); c.shadowBlur = 0; c.lineWidth = Math.max(1, bw * 0.3); c.strokeStyle = '#ffffffcc'; path(c, cx, cy, r); c.stroke(); }
+      else if (st.border === 'solid') { path(c, cx, cy, r); c.stroke(); }
+      else if (st.border === 'double') { path(c, cx, cy, r); c.stroke(); c.lineWidth = Math.max(1, bw * 0.45); c.strokeStyle = st.color2; path(c, cx, cy, r - bw * 1.1); c.stroke(); }
+      else if (st.border === 'tech') { path(c, cx, cy, r); c.strokeStyle = '#000'; c.stroke(); c.strokeStyle = st.color; c.setLineDash([r * 0.42, r * 0.12]); path(c, cx, cy, r); c.stroke(); c.setLineDash([]); c.lineWidth = Math.max(1, bw * 0.3); c.strokeStyle = st.color2; path(c, cx, cy, r - bw * 0.9); c.stroke(); }
+      else if (st.border === 'notch') { path(c, cx, cy, r); c.lineWidth = Math.max(1, bw * 0.35); c.stroke(); c.lineWidth = bw; c.strokeStyle = st.color2;
+        for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2; c.beginPath(); if (st.shape === 'circle' || st.shape === 'hex') c.arc(cx, cy, r, a - 0.28, a + 0.28); else { const sx = Math.sign(Math.cos(a)), sy = Math.sign(Math.sin(a)), L = r * 0.45; c.moveTo(cx + sx * r, cy + sy * (r - L)); c.lineTo(cx + sx * r, cy + sy * r); c.lineTo(cx + sx * (r - L), cy + sy * r); } c.stroke(); } }
+      c.restore();
+    }
+    const draw = () => { render(g, P); if (!st.img) { g.fillStyle = '#8aa0c2'; g.font = '16px "Share Tech Mono", monospace'; g.textAlign = 'center'; g.fillText('Pick a picture (or paste one)', P / 2, P / 2); } };
+    const setImg = src => { const im = new Image(); im.onload = () => { st.img = im; st.x = st.y = 0; st.z = 1; st.rot = 0; zoom.value = 1; draw(); }; im.onerror = () => toast("Couldn't open that picture", true); im.src = src; };
+    const fromFile = f => { if (!f || !/^image\//.test(f.type)) return toast('That is not a picture', true); const rd = new FileReader(); rd.onload = () => setImg(rd.result); rd.readAsDataURL(f); };
+    // drag & zoom
+    let dragP = null;
+    cv2.addEventListener('pointerdown', e => { if (!st.img) return; dragP = { x: e.clientX, y: e.clientY, ox: st.x, oy: st.y }; try { cv2.setPointerCapture(e.pointerId); } catch (er) { } });
+    cv2.addEventListener('pointermove', e => { if (!dragP) return; const sc = P / cv2.getBoundingClientRect().width; st.x = dragP.ox + (e.clientX - dragP.x) * sc; st.y = dragP.oy + (e.clientY - dragP.y) * sc; draw(); });
+    cv2.addEventListener('pointerup', () => { dragP = null; });
+    cv2.addEventListener('wheel', e => { if (!st.img) return; e.preventDefault(); st.z = Math.max(0.2, Math.min(8, st.z * (e.deltaY < 0 ? 1.08 : 1 / 1.08))); zoom.value = st.z; draw(); }, { passive: false });
+    cv2.addEventListener('dragover', e => e.preventDefault());
+    cv2.addEventListener('drop', e => { e.preventDefault(); fromFile(e.dataTransfer.files[0]); });
+    const onPaste = e => { const it = [...(e.clipboardData || {}).items || []].find(i => i.type.startsWith('image/')); if (it) fromFile(it.getAsFile()); };
+    document.addEventListener('paste', onPaste);
+    const zoom = el('input', { type: 'range', min: 0.2, max: 6, step: 0.01, value: 1, class: 'grow', oninput: e => { st.z = Number(e.target.value); draw(); } });
+    const rotI = el('input', { type: 'range', min: -180, max: 180, step: 1, value: 0, class: 'grow', oninput: e => { st.rot = Number(e.target.value); draw(); } });
+    const save = () => { LS.set('nct-tm', { shape: st.shape, border: st.border, color: st.color, color2: st.color2, width: st.width, bg: st.bg }); };
+    const chooser = (list, key) => el('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px' }, ...list.map(([k, l]) => { const b = el('button', { class: 'small' + (st[key] === k ? ' primary' : ''), text: l, onclick: () => { st[key] = k; save(); [...b.parentNode.children].forEach(x => x.classList.remove('primary')); b.classList.add('primary'); draw(); } }); return b; }));
+    const color = (key, title) => el('input', { type: 'color', value: st[key], title, oninput: e => { st[key] = e.target.value; save(); draw(); } });
+    const file = el('input', { type: 'file', accept: 'image/*', class: 'hidden', onchange: e => fromFile(e.target.files[0]) });
+    const finish = () => {
+      if (!st.img) return toast('Pick a picture first', true);
+      const out = el('canvas', { width: OUT, height: OUT }); render(out.getContext('2d'), OUT);
+      let url; try { url = out.toDataURL('image/png'); if (url.length > 500000) url = out.toDataURL('image/webp', 0.9); } catch (e) { return toast("That picture can't be used (the website it came from blocks it). Save it to your computer and pick the file instead.", true); }
+      document.removeEventListener('paste', onPaste); closeModal(); onDone && onDone(url);
+    };
+    const dl = () => { if (!st.img) return toast('Pick a picture first', true); const out = el('canvas', { width: 512, height: 512 }); render(out.getContext('2d'), 512); const a = el('a', { href: out.toDataURL('image/png'), download: 'token.png' }); document.body.append(a); a.click(); a.remove(); };
+    m.append(el('div', { class: 'tm' },
+      el('div', { class: 'tm-left' }, cv2,
+        el('div', { class: 'row' }, el('button', { class: 'primary grow', text: '🖼 Pick a picture…', onclick: () => file.click() }), file),
+        el('div', { class: 'dim', style: 'font-size:.75rem;text-align:center', text: 'Drag to move · scroll to zoom · drop or paste (Ctrl+V) a picture' })),
+      el('div', { class: 'tm-right col' },
+        el('label', { text: 'Zoom' }), el('div', { class: 'row' }, zoom),
+        el('label', { text: 'Rotate picture' }), el('div', { class: 'row' }, rotI),
+        el('label', { text: 'Shape' }), chooser(SHAPES, 'shape'),
+        el('label', { text: 'Border' }), chooser(BORDERS, 'border'),
+        el('div', { class: 'row' }, el('label', { text: 'Colours' }), color('color', 'Main border colour'), color('color2', 'Accent colour'), el('label', { text: 'Background' }), color('bg', 'Colour behind see-through pictures')),
+        el('label', { text: 'Border thickness' }), el('div', { class: 'row' }, el('input', { type: 'range', min: 2, max: 30, step: 1, value: st.width, class: 'grow', oninput: e => { st.width = Number(e.target.value); save(); draw(); } })),
+        el('div', { class: 'row', style: 'margin-top:12px' }, el('button', { class: 'ghost', text: '⬇ Download PNG', onclick: dl }), el('div', { class: 'grow' }),
+          el('button', { class: 'pink', style: 'padding:10px 20px', text: opts.saveLabel || '✓ Use this token', onclick: finish })))));
+    const obs = new MutationObserver(() => { if (!document.body.contains(cv2)) { document.removeEventListener('paste', onPaste); obs.disconnect(); } }); obs.observe(document.body, { childList: true, subtree: true });
+    draw();
+    if (opts.src) setImg(opts.src);
+  }
+
+  // ================= NPC LIBRARY (DM only) =================
+  // Generic Cyberpunk 2020-style opponents with ready sheets. Stats order: INT REF TECH COOL ATTR LUCK MA BODY EMP.
+  // sp: [head, torso, arms, legs]. Weapons: [name, type, WA, damage, shots, ROF, reliability, range(m)].
+  const W_ = {
+    knife: ['Knife', 'Melee', 0, '1d6', '', '1', 'VR', '1'], club: ['Club / bat', 'Melee', 0, '1d6+2', '', '1', 'VR', '1'], chain: ['Chain', 'Melee', 0, '1d6+1', '', '1', 'VR', '2'],
+    sword: ['Sword', 'Melee', 0, '2d6+2', '', '1', 'VR', '1'], mono: ['Monoknife', 'Melee', 1, '2d6', '', '1', 'VR', '1'], cyberclaws: ['Rippers (cyber claws)', 'Melee', 0, '1d6+3', '', '1', 'VR', '1'],
+    lpistol: ['Light pistol', 'Pistol', 0, '1d6+1', '8', '2', 'ST', '50'], mpistol: ['Medium pistol', 'Pistol', 0, '2d6+1', '10', '2', 'ST', '50'], hpistol: ['Heavy pistol', 'Pistol', 0, '3d6', '8', '2', 'ST', '50'], vhpistol: ['Very heavy pistol', 'Pistol', -1, '4d6', '8', '1', 'ST', '50'],
+    lsmg: ['Light SMG', 'SMG', 0, '1d6+2', '30', '25', 'ST', '150'], msmg: ['Medium SMG', 'SMG', 0, '2d6+1', '40', '20', 'ST', '150'], hsmg: ['Heavy SMG', 'SMG', -1, '3d6', '35', '15', 'UR', '150'],
+    ar: ['Assault rifle', 'Rifle', 0, '5d6', '30', '30', 'VR', '400'], shotgun: ['Pump shotgun', 'Shotgun', 0, '4d6', '8', '1', 'ST', '50'], autoshot: ['Auto shotgun', 'Shotgun', -1, '4d6', '20', '10', 'ST', '50'],
+    sniper: ['Sniper rifle', 'Rifle', 1, '6d6', '4', '1', 'VR', '800'], lmg: ['Light machine gun', 'Heavy', 0, '6d6', '100', '20', 'VR', '500'], gl: ['Grenade launcher', 'Heavy', 0, '6d6', '6', '1', 'VR', '150'],
+    flame: ['Flamethrower', 'Heavy', -2, '2d10', '10', '1', 'ST', '50'], taser: ['Stun gun', 'Pistol', -1, 'Stun', '10', '1', 'ST', '10']
+  };
+  const NPC_LIB = [
+    // ---- street ----
+    { cat: 'Street', name: 'Boostergang punk', role: 'solo', st: [4, 6, 4, 5, 4, 4, 6, 6, 4], sa: 1, sk: { Brawling: 3, Handgun: 3, Melee: 3, 'Dodge & Escape': 2, Streetwise: 3, Intimidate: 2, Athletics: 2 }, sp: [0, 10, 10, 4], w: ['lpistol', 'chain'], cy: ['Cyberoptic: Times Square Marquee', 'Neural link'], note: 'Cheap chrome, loud and hopped up. Breaks and runs when half the gang is down.' },
+    { cat: 'Street', name: 'Booster lieutenant', role: 'solo', st: [5, 8, 4, 7, 5, 5, 7, 7, 3], sa: 3, sk: { Brawling: 4, Submachinegun: 5, Handgun: 4, Melee: 4, 'Dodge & Escape': 3, Streetwise: 5, Intimidate: 4, Leadership: 3, 'Awareness/Notice': 3 }, sp: [10, 14, 14, 10], w: ['msmg', 'mono'], cy: ['Boosted reflexes (Kerenzikov) +1 initiative', 'Smartgun link', 'Muscle & bone lace (BODY +2)'], note: 'Runs a crew of 4–8 punks. Fights from cover and sends the punks in first.' },
+    { cat: 'Street', name: 'Street thug', role: 'solo', st: [4, 5, 3, 5, 4, 4, 5, 7, 4], sa: 0, sk: { Brawling: 4, Melee: 3, Handgun: 2, Streetwise: 3, Intimidate: 3 }, sp: [0, 4, 0, 4], w: ['club', 'lpistol'], cy: [], note: 'Muscle for hire. Usually unchromed.' },
+    { cat: 'Street', name: 'Chromed brawler', role: 'solo', st: [4, 7, 3, 6, 3, 4, 7, 10, 3], sa: 2, sk: { Brawling: 6, 'Martial Arts': 3, Melee: 4, 'Dodge & Escape': 4, Intimidate: 5, Athletics: 4, 'Strength Feat': 4 }, sp: [4, 14, 14, 10], w: ['cyberclaws'], cy: ['Cyberarm (x2) with rippers', 'Muscle & bone lace', 'Subdermal armor (SP 14 torso)'], note: 'Closes the distance fast. Hits hard: add the strength damage bonus.' },
+    { cat: 'Street', name: 'Gang shooter', role: 'solo', st: [5, 7, 4, 6, 4, 5, 6, 6, 4], sa: 2, sk: { Handgun: 5, Rifle: 3, Submachinegun: 4, 'Dodge & Escape': 3, Stealth: 3, 'Awareness/Notice': 3, Streetwise: 3 }, sp: [0, 14, 14, 10], w: ['hpistol', 'lsmg'], cy: ['Cyberoptic: targeting scope'], note: 'The gang\'s best shot. Stays back and uses cover.' },
+    { cat: 'Street', name: 'Organ legger (scav)', role: 'medtech', st: [6, 6, 7, 6, 3, 4, 6, 6, 2], sa: 2, sk: { 'First Aid': 5, Handgun: 3, Melee: 4, Stealth: 4, Pharmaceuticals: 4, 'Hide/Evade': 3, Streetwise: 4 }, sp: [0, 10, 10, 4], w: ['taser', 'knife', 'mpistol'], cy: ['Cyberoptic: IR'], note: 'Hunts the injured and helpless. Stuns first, cuts later. Flees from a real fight.' },
+    // ---- corporate ----
+    { cat: 'Corporate', name: 'Corp security guard', role: 'solo', st: [5, 6, 5, 6, 5, 5, 6, 7, 5], sa: 2, sk: { Handgun: 4, Submachinegun: 4, Brawling: 3, 'Awareness/Notice': 4, 'Dodge & Escape': 2, Driving: 2 }, sp: [14, 18, 14, 10], w: ['msmg', 'mpistol', 'taser'], cy: ['Neural link', 'Interface plugs', 'Radio link'], note: 'Calls for backup within a turn of trouble. Response team arrives in 1d6+2 turns.' },
+    { cat: 'Corporate', name: 'Corp security elite', role: 'solo', st: [6, 9, 5, 8, 5, 5, 8, 8, 3], sa: 5, sk: { Rifle: 6, Handgun: 6, Submachinegun: 5, 'Martial Arts': 4, 'Dodge & Escape': 5, 'Awareness/Notice': 6, Athletics: 4, Stealth: 3 }, sp: [20, 20, 20, 14], w: ['ar', 'hpistol'], cy: ['Smartgun link', 'Boosted reflexes (Sandevistan) +3 initiative', 'Cyberoptic: low-light, targeting scope', 'Radio link'], note: 'Professional, works in fire teams of 3–4 with overlapping fields of fire.' },
+    { cat: 'Corporate', name: 'Corporate exec', role: 'corp', st: [8, 5, 5, 8, 7, 6, 5, 5, 6], sa: 5, sk: { 'Human Perception': 5, 'Persuasion & Fast Talk': 6, Leadership: 5, Handgun: 2, Accounting: 5, 'Stock Market': 4, Social: 6, 'Wardrobe & Style': 5 }, sp: [0, 14, 14, 0], w: ['lpistol'], cy: ['Neural link', 'Cyberaudio: phone link', 'Biomonitor (calls Trauma Team)'], note: 'Never alone: has 2 guards. Trauma Team arrives 1d6 turns after the exec is hurt.' },
+    { cat: 'Corporate', name: 'Corporate netrunner', role: 'netrunner', st: [9, 6, 7, 6, 4, 5, 5, 5, 4], sa: 6, sk: { Programming: 6, 'System Knowledge': 7, 'Electronic Security': 5, 'Cyberdeck Design': 3, Handgun: 2, 'Awareness/Notice': 4 }, sp: [0, 10, 10, 0], w: ['lpistol'], cy: ['Interface plugs', 'Neural link', 'Cyberdeck (5 programs)'], note: 'Usually in a secure room nearby. Can lock doors, cut lights and turn turrets on intruders.' },
+    { cat: 'Corporate', name: 'Corporate assassin', role: 'solo', st: [7, 10, 5, 9, 6, 6, 8, 7, 2], sa: 7, sk: { Handgun: 7, Rifle: 6, Melee: 6, 'Martial Arts': 5, Stealth: 7, 'Dodge & Escape': 6, 'Awareness/Notice': 6, Disguise: 4, 'Shadow/Track': 5 }, sp: [10, 20, 20, 14], w: ['sniper', 'vhpistol', 'mono'], cy: ['Smartgun link', 'Boosted reflexes +3', 'Cyberoptics: thermo, low-light, targeting', 'Skinweave SP 12'], note: 'Works alone, from range first. Withdraws if spotted and tries again later.' },
+    // ---- law ----
+    { cat: 'Law', name: 'Beat cop', role: 'cop', st: [5, 6, 5, 6, 5, 5, 6, 6, 5], sa: 3, sk: { Handgun: 4, Rifle: 3, Brawling: 3, 'Awareness/Notice': 4, Driving: 3, Streetwise: 3, Interrogation: 2 }, sp: [0, 14, 14, 0], w: ['hpistol', 'shotgun', 'taser'], cy: ['Radio link'], note: 'Works in pairs. Calls it in and waits for backup against heavy chrome.' },
+    { cat: 'Law', name: 'C-SWAT officer', role: 'cop', st: [6, 8, 5, 7, 5, 5, 7, 8, 4], sa: 5, sk: { Rifle: 6, Handgun: 5, 'Heavy Weapons': 3, Brawling: 4, 'Dodge & Escape': 4, Athletics: 4, 'Awareness/Notice': 5 }, sp: [20, 25, 20, 20], w: ['ar', 'autoshot', 'gl'], cy: ['Smartgun link', 'Radio link', 'Cyberoptic: low-light'], note: 'Arrives in a team of 4–6 with an AV. Uses gas and flashbangs before entering.' },
+    { cat: 'Law', name: 'Psycho squad trooper', role: 'cop', st: [6, 9, 5, 8, 4, 5, 8, 9, 3], sa: 6, sk: { Rifle: 7, 'Heavy Weapons': 5, Handgun: 5, 'Martial Arts': 4, 'Dodge & Escape': 5, 'Awareness/Notice': 5 }, sp: [25, 25, 20, 20], w: ['lmg', 'vhpistol'], cy: ['Smartgun link', 'Boosted reflexes +2', 'Muscle & bone lace', 'Subdermal armor'], note: 'Hunts cyberpsychos. Fights to finish the target, not to arrest.' },
+    { cat: 'Law', name: 'Detective', role: 'cop', st: [7, 6, 5, 7, 5, 6, 6, 6, 6], sa: 4, sk: { Handgun: 5, Interrogation: 5, 'Human Perception': 5, 'Awareness/Notice': 6, Streetwise: 5, 'Shadow/Track': 4, 'Library Search': 4 }, sp: [0, 14, 14, 0], w: ['hpistol'], cy: ['Cyberaudio: voice stress analyzer'], note: 'Asks questions first. Knows who in the area owes them favours.' },
+    // ---- other ----
+    { cat: 'Other', name: 'Nomad raider', role: 'nomad', st: [5, 7, 6, 6, 4, 5, 7, 7, 5], sa: 3, sk: { Rifle: 5, Driving: 6, Motorcycle: 5, Brawling: 4, Melee: 3, 'Wilderness Survival': 4, 'Basic Tech': 4 }, sp: [10, 14, 14, 10], w: ['shotgun', 'ar', 'knife'], cy: ['Cyberoptic: low-light'], note: 'Strikes from vehicles and leaves fast. Loyal to the family above all.' },
+    { cat: 'Other', name: 'Mercenary veteran', role: 'solo', st: [6, 8, 5, 8, 4, 5, 7, 8, 3], sa: 5, sk: { Rifle: 6, 'Heavy Weapons': 4, Handgun: 5, Brawling: 4, 'Dodge & Escape': 4, 'Awareness/Notice': 5, 'First Aid': 3, Demolitions: 3 }, sp: [14, 20, 14, 14], w: ['ar', 'hpistol', 'knife'], cy: ['Smartgun link', 'Cyberarm with popup gun', 'Cyberoptic: targeting scope'], note: 'Fights for pay, not glory. Will take a better offer mid-fight.' },
+    { cat: 'Other', name: 'Freelance netrunner', role: 'netrunner', st: [8, 6, 7, 6, 5, 6, 5, 4, 5], sa: 5, sk: { Programming: 5, 'System Knowledge': 6, 'Electronic Security': 4, Stealth: 3, Handgun: 2, Streetwise: 3 }, sp: [0, 10, 4, 0], w: ['lpistol'], cy: ['Interface plugs', 'Neural link', 'Cyberdeck'], note: 'Usually protected by a solo or two while jacked in.' },
+    { cat: 'Other', name: 'Fixer', role: 'fixer', st: [7, 6, 5, 7, 6, 7, 6, 5, 6], sa: 5, sk: { Streetwise: 7, 'Persuasion & Fast Talk': 6, 'Human Perception': 5, Handgun: 4, Intimidate: 3, 'Awareness/Notice': 4 }, sp: [0, 14, 14, 0], w: ['mpistol'], cy: ['Cyberaudio: phone link, scrambler'], note: 'Has a bodyguard and a way out of every room.' },
+    { cat: 'Other', name: 'Cyberpsycho', role: 'solo', st: [4, 10, 4, 10, 2, 5, 9, 11, 0], sa: 6, sk: { Brawling: 6, 'Martial Arts': 5, 'Heavy Weapons': 5, Rifle: 6, Melee: 6, 'Dodge & Escape': 5, Athletics: 5, Intimidate: 8 }, sp: [20, 25, 25, 20], w: ['lmg', 'cyberclaws', 'vhpistol'], cy: ['Two cyberarms with rippers and a popup gun', 'Boosted reflexes +3', 'Muscle & bone lace', 'Subdermal armor', 'Pain editor (ignores stun until mortal)'], note: 'Humanity gone. Attacks anything nearby. A job for the Psycho squad.' },
+    { cat: 'Other', name: 'Trauma Team medic', role: 'medtech', st: [7, 7, 7, 7, 5, 5, 6, 6, 5], sa: 5, sk: { 'First Aid': 7, Pharmaceuticals: 5, Rifle: 4, Handgun: 4, 'Awareness/Notice': 4, 'Dodge & Escape': 3 }, sp: [20, 20, 20, 14], w: ['msmg'], cy: ['Biomonitor', 'Radio link'], note: 'Here to save one client, not to fight. Their gunner will shoot anyone in the way.' }
+  ];
+  function npcSheet(tp, name) {
+    const s = N.blankSheet(null); s.name = name || tp.name; s.role = tp.role; s.specialAbility = tp.sa || 0;
+    N.STATS.forEach((k, i) => { s.stats[k].base = tp.st[i]; });
+    for (const [n, v] of Object.entries(tp.sk || {})) { const k = s.skills.find(x => x.name === n); if (k) k.value = v; else s.skills.push({ name: n, stat: '', value: v }); }
+    s.sp = { head: tp.sp[0], torso: tp.sp[1], rArm: tp.sp[2], lArm: tp.sp[2], rLeg: tp.sp[3], lLeg: tp.sp[3] };
+    s.weapons = (tp.w || []).map(k => { const [nm, type, wa, damage, shots, rof, rel, range] = W_[k]; return { name: nm, type, wa, damage, shots, rof, rel, range, skill: N.weaponSkill(type), notes: '', left: parseInt(shots, 10) || 0, mags: shots ? 2 : 0 }; });
+    s.cyberware = (tp.cy || []).map(c => ({ name: c, hl: '', notes: '' }));
+    s.notes = tp.note || ''; s.humanity = Math.max(0, tp.st[8] * 10 - (tp.cy || []).length * 6);
+    return s;
+  }
+  function openNpcLibrary() {
+    if (!isGM()) return;
+    const m = modal('📚 NPC library (DM only)', true);
+    const q = el('input', { placeholder: 'Search…', class: 'grow' });
+    const count = el('input', { type: 'number', value: 1, min: 1, max: 12, style: 'width:64px', title: 'How many to add' });
+    const place = el('input', { type: 'checkbox', checked: !!activeMap() });
+    const hide = el('input', { type: 'checkbox', checked: false });
+    const list = el('div', { class: 'npclist' });
+    const add = tp => {
+      const n = Math.max(1, Math.min(12, Number(count.value) || 1));
+      for (let i = 1; i <= n; i++) {
+        const s = npcSheet(tp, n > 1 ? tp.name + ' ' + i : tp.name);
+        request({ type: 'sheet.upsert', sheet: s });
+        if (place.checked && activeMap()) placeToken({ name: s.name, color: '#ff2a6d', sheetId: s.id, hidden: hide.checked });
+      }
+      toast('Added ' + n + ' × ' + tp.name + (place.checked && activeMap() ? ' to the map' : ' to Sheets'));
+    };
+    const draw = () => {
+      list.textContent = ''; const f = q.value.trim().toLowerCase();
+      for (const cat of ['Street', 'Corporate', 'Law', 'Other']) {
+        const items = NPC_LIB.filter(t => t.cat === cat && (!f || (t.name + ' ' + t.note + ' ' + t.cy.join(' ')).toLowerCase().includes(f)));
+        if (!items.length) continue;
+        list.append(el('div', { class: 'section-h', text: cat }));
+        for (const tp of items) {
+          const sp = 'SP ' + tp.sp[0] + '/' + tp.sp[1], wpn = (tp.w || []).map(k => W_[k][0] + ' ' + W_[k][3]).join(', ');
+          list.append(el('div', { class: 'npcrow' },
+            el('div', { class: 'grow' }, el('b', { text: tp.name }), el('span', { class: 'dim', text: '  ' + ((N.ROLES[tp.role] || {}).label || tp.role) + ' · REF ' + tp.st[1] + ' · BODY ' + tp.st[7] + ' · ' + sp + ' head/torso' }),
+              el('div', { class: 'dim', style: 'font-size:.8rem', text: wpn + (tp.cy.length ? ' · ' + tp.cy.length + ' cyberware' : '') }), el('div', { style: 'font-size:.8rem', text: tp.note })),
+            el('button', { class: 'small ghost', text: 'Preview', onclick: () => { const s = npcSheet(tp); s.id = 'preview'; previewNpc(s); } }),
+            el('button', { class: 'small primary', text: '+ Add', onclick: () => add(tp) })));
+        }
+      }
+    };
+    q.oninput = draw;
+    m.append(el('p', { class: 'dim', text: 'Ready-made opponents with full sheets. Added NPCs are only visible to you, and you can edit them like any sheet.' }),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, q, el('label', { text: 'How many' }), count, el('label', { class: 'row' }, place, 'Place on the map'), el('label', { class: 'row' }, hide, 'Hidden from players')),
+      list);
+    draw();
+  }
+  function previewNpc(s) {
+    const d = N.derived(s);
+    const m = modal('Preview: ' + s.name);
+    m.append(el('div', { class: 'mono', style: 'white-space:pre-wrap;line-height:1.6', text:
+      N.STATS.map(k => k + ' ' + N.statVal(s, k)).join('  ') + '\nBTM ' + d.btm + ' · Save ' + d.save + ' · Run ' + d.run + ' m\n\nSkills: ' + s.skills.filter(k => k.value).map(k => k.name + ' ' + k.value).join(', ') +
+      '\n\nArmor: ' + N.LOCS.map(([k, l]) => l + ' ' + s.sp[k]).join(', ') + '\n\nWeapons:\n' + s.weapons.map(w => '  ' + w.name + ' (' + w.type + ') WA ' + w.wa + ' · ' + w.damage + (w.shots ? ' · ' + w.shots + ' rds · ROF ' + w.rof : '') + ' · ' + w.range + ' m').join('\n') +
+      (s.cyberware.length ? '\n\nCyberware:\n' + s.cyberware.map(c => '  ' + c.name).join('\n') : '') + '\n\n' + s.notes }));
+  }
+
+  // ================= LORE TIMELINE (DM only) =================
+  // A summary of the canon Cyberpunk history (2020, RED and 2077 eras), written for Night City Table.
+  const TIMELINE = [
+    ['The road to the Collapse (1990s)', [
+      ['Early 1990s', 'A shadow alliance of US intelligence and police agencies (the "Gang of Four") quietly takes control of the federal government.'],
+      ['Early 1990s', 'Developer Richard Night lines up corporate backing for a planned, crime-free city on cheap land at Del Coronado Bay, a ghost town after a boostergang massacre.'],
+      ['1994', 'The world stock market crashes after the US is caught rigging markets. Construction of Coronado City is under way and the city is incorporated.'],
+      ['Mid-1990s', 'The Collapse: the US economy and government fall apart. Millions lose their homes and take to the roads as Nomads.'],
+      ['1997', 'The Mideast Meltdown: a limited nuclear exchange wrecks much of the Middle East and cuts world oil supply sharply.'],
+      ['20 Sept 1998', 'Richard Night is shot dead in his penthouse. The killer is never found. Coronado City is renamed Night City in his honour.'],
+      ['1999', 'His widow Miriam Night turns his company into the Night foundation (later Night Corp) to keep his vision alive.']]],
+    ['Mob rule and the corporations (1999–2020)', [
+      ['1999–2009', 'Organised crime runs Night City. Gangs carve out turf and the streets become a war zone.'],
+      ['2009–2011', 'The Mob War, the deadliest years in the city\'s history, ends when the megacorps (Arasaka at the front) send in paramilitary forces. The corps keep a firm grip on the city afterwards.'],
+      ['2000s–2010s', 'A series of Corporate Wars, each more open than the last, as megacorps fight with their own armies over markets.'],
+      ['2020', 'The Cyberpunk 2020 era: corporate Night City, booster gangs, cyberware everywhere, and Arasaka Tower over downtown.']]],
+    ['The Fourth Corporate War (2021–2025)', [
+      ['2021', 'Two ocean megacorps, CINO and OTEC, fight over a failing sea-shipping company. Arasaka backs CINO and Militech backs OTEC, and it grows into open war.'],
+      ['2022', 'The war goes hot around the world and in orbit. Rache Bartmoss\'s DataKrash viruses are released and the old worldwide NET collapses.'],
+      ['20 Aug 2023', 'A team including rockerboy Johnny Silverhand and solo Morgan Blackhand raids Arasaka Tower. A nuclear device destroys the tower and much of downtown: the Night City Holocaust.'],
+      ['2023–2025', 'The war winds down. Arasaka is thrown out of the US and pulls back to Japan; the US government takes over Militech.']]],
+    ['The Time of the Red (2025–2045)', [
+      ['2025 onward', 'Smoke and fallout turn skies red for years, giving the era its name. Without a working NET, data moves on local networks and by hand.'],
+      ['2025 onward', 'Night City rebuilds with Night Corp, smaller corporations and Nomad families doing the work. The bombed downtown becomes the Hot Zone.'],
+      ['2045', 'The Cyberpunk RED era: a scarred city getting back on its feet, with Edgerunners doing the dirty work.']]],
+    ['Toward 2077', [
+      ['2045–2069', 'Night City keeps rebuilding. Arasaka slowly works its way back into the city.'],
+      ['2069–2070', 'The Unification War (the "Metal Wars"): President Rosalind Myers tries to bring the Free States back under federal rule. Arasaka steps in to defend Night City, and the Treaty of Unification (the Arvin Accord) ends the war. Night City comes out of it a free, independent city.'],
+      ['2077', 'The Cyberpunk 2077 era. A heist at Arasaka\'s Konpeki Plaza goes wrong: Saburo Arasaka dies at his son Yorinobu\'s hands, and mercenary V ends up with a chip holding Johnny Silverhand\'s mind. The same night, Mayor Lucius Rhyne, a hero of the Unification War, dies.'],
+      ['2077', 'In Dogtown, a walled-off district run by Kurt Hansen, federal agents work to save President Myers after her plane goes down (Phantom Liberty).']]],
+    ['Your campaign', [['2079', 'Two years after the events of 2077. Anything after this point is yours to decide.']]]
+  ];
+  function openTimeline() {
+    if (!isGM()) return;
+    const m = modal('🗓 Lore timeline (DM only)', true);
+    const q = el('input', { class: 'grow', placeholder: 'Search, e.g. Arasaka, Night, 2023' });
+    const body = el('div', { class: 'col', style: 'gap:12px' });
+    const draw = () => { body.textContent = ''; const f = q.value.trim().toLowerCase();
+      for (const [era, items] of TIMELINE) { const ls = items.filter(([y, t]) => !f || (era + ' ' + y + ' ' + t).toLowerCase().includes(f)); if (!ls.length) continue;
+        body.append(el('div', { style: 'border:1px solid var(--line);padding:10px' }, el('div', { class: 'section-h', style: 'margin:0 0 6px', text: era }),
+          ...ls.map(([y, t]) => el('div', { class: 'tl-row' }, el('b', { class: 'tl-y', text: y }), el('span', { text: t }), el('button', { class: 'small ghost', text: 'Share', title: 'Post this to the chat for everyone', onclick: () => request({ type: 'chat', text: '📜 ' + y + ': ' + t }) }))))); }
+      if (!body.children.length) body.append(el('div', { class: 'dim', text: 'Nothing matches.' })); };
+    q.oninput = draw; draw();
+    m.append(el('div', { class: 'row', style: 'margin-bottom:10px' }, q), body,
+      el('p', { class: 'dim', style: 'font-size:.78rem;margin-top:12px', text: 'A short summary of the official Cyberpunk history (2020, RED and 2077), written for Night City Table. Some early dates differ between books; your table\'s version always wins.' }));
   }

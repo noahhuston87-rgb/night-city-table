@@ -384,3 +384,26 @@ table.wt input{width:100%;padding:2px 4px}
 #streamplayer .sp-vol{display:flex;align-items:center;gap:6px;padding:0 8px 4px;font-size:.8rem}
 #streamplayer .sp-vol input{flex:1}
 #streamplayer{position:fixed}
+.turngrid{display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin:8px 0}
+.turnb{height:56px;font-size:1.6rem;padding:0}
+.turnc{display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--d)}
+.faces{display:flex;flex-wrap:wrap;gap:10px}
+.facecard{position:relative;width:110px;border:1px solid var(--line);padding:8px;text-align:center;cursor:pointer;background:var(--field)}
+.facecard.on{border-color:var(--p);box-shadow:0 0 calc(10px*var(--gl)) var(--glow)}
+.facecard img,.faceblank{width:90px;height:90px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 6px;background:#0b0f1a}
+.faceblank{display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--p)}
+.facecard .fn{font-size:.75rem;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.facecard .fx{position:absolute;top:2px;right:2px;min-height:0;padding:0 6px}
+.condgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+.cond{display:flex;align-items:center;gap:8px;justify-content:flex-start;text-transform:none}
+.cond .ci{font-size:1.2rem}
+.cond.on{background:var(--p);color:#000;border-color:var(--p)}
+.tm{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start}
+.tm-left{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.tm-canvas{width:400px;max-width:100%;aspect-ratio:1;background:repeating-conic-gradient(#151b2b 0 25%,#0d1220 0 50%) 0 0/24px 24px;border:1px solid var(--line);touch-action:none;cursor:grab}
+.tm-right label{font-size:.75rem;color:var(--d);text-transform:uppercase;margin-top:6px}
+@media (max-width:760px){.tm{grid-template-columns:1fr}.tm-canvas{width:100%}}
+.npclist{max-height:60vh;overflow:auto}
+.npcrow{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--line)}
+.tl-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:start;margin:5px 0;line-height:1.45}.tl-y{color:var(--s)}
+@media (max-width:760px){.tl-row{grid-template-columns:1fr auto}.tl-y{grid-column:1/-1}}
