@@ -492,7 +492,7 @@
       }
       case 'map.add': {
         if (!isGM) return deny();
-        const m = newMap(req.name, isImg(req.img) ? req.img : '', clamp(req.w, 100, 12000), clamp(req.h, 100, 12000));
+        const m = newMap(req.name, isImg(req.img) ? req.img : '', clamp(req.w, 100, 16000), clamp(req.h, 100, 16000));
         if (req.grid) m.grid.size = clamp(req.grid, 10, 400);
         out.ops.push({ type: 'map.add', map: m }); return out;
       }
@@ -501,8 +501,8 @@
         const p = {}; const q = req.patch || {};
         if (q.name !== undefined) p.name = str(q.name, 80);
         if (q.bg !== undefined && /^#[0-9a-f]{6}$/i.test(q.bg)) p.bg = q.bg;
-        if (q.grid) { p.grid = {}; if (q.grid.size !== undefined) p.grid.size = clamp(q.grid.size, 10, 400); if (q.grid.show !== undefined) p.grid.show = !!q.grid.show; if (q.grid.ox !== undefined) p.grid.ox = clamp(q.grid.ox, -400, 400); if (q.grid.oy !== undefined) p.grid.oy = clamp(q.grid.oy, -400, 400); if (q.grid.alpha !== undefined) p.grid.alpha = clamp(q.grid.alpha, 0, 1); if (q.grid.color !== undefined && /^#[0-9a-f]{6}$/i.test(q.grid.color)) p.grid.color = q.grid.color; }
-        if (q.w !== undefined) p.w = clamp(q.w, 100, 12000); if (q.h !== undefined) p.h = clamp(q.h, 100, 12000);
+        if (q.grid) { p.grid = {}; if (q.grid.size !== undefined) p.grid.size = Math.round(clamp(q.grid.size, 10, 400) * 100) / 100; if (q.grid.show !== undefined) p.grid.show = !!q.grid.show; if (q.grid.ox !== undefined) p.grid.ox = clamp(q.grid.ox, -400, 400); if (q.grid.oy !== undefined) p.grid.oy = clamp(q.grid.oy, -400, 400); if (q.grid.alpha !== undefined) p.grid.alpha = clamp(q.grid.alpha, 0, 1); if (q.grid.color !== undefined && /^#[0-9a-f]{6}$/i.test(q.grid.color)) p.grid.color = q.grid.color; }
+        if (q.w !== undefined) p.w = Math.round(clamp(q.w, 100, 16000)); if (q.h !== undefined) p.h = Math.round(clamp(q.h, 100, 16000));
         out.ops.push({ type: 'map.update', id: req.id, patch: p }); return out;
       }
       case 'map.delete': if (!isGM) return deny(); out.ops.push({ type: 'map.delete', id: str(req.id, 20) }); return out;

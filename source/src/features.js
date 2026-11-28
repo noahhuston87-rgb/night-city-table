@@ -1310,3 +1310,66 @@
     setTimeout(() => text.focus(), 50);
   }
   { const b = document.getElementById('annBtn'); if (b) b.onclick = () => { if (S) openAnnouncements(); }; }
+
+  // ================= MAP SIZE (pixels / squares, like Roll20's page settings) =================
+  function openMapSize(m0) {
+    const m = activeMap() || m0; if (!m || !isGM()) return;
+    const im = m.img ? getImg(m.img) : null;
+    const pic = im && im.naturalWidth ? { w: im.naturalWidth, h: im.naturalHeight } : null;
+    const st = { g: m.grid.size, w: m.w, h: m.h, mode: 'squares', lock: !!m.img, moveTokens: true };
+    const dlg = modal('📐 Map size: ' + m.name);
+    const gIn = el('input', { type: 'number', min: 10, max: 400, step: 1, value: st.g, style: 'width:90px' });
+    const wIn = el('input', { type: 'number', style: 'width:100px' }), hIn = el('input', { type: 'number', style: 'width:100px' });
+    const unit = el('span', { class: 'dim' });
+    const lock = el('input', { type: 'checkbox', checked: st.lock });
+    const moveT = el('input', { type: 'checkbox', checked: true });
+    const across = el('input', { type: 'number', min: 1, max: 400, placeholder: 'e.g. 30', style: 'width:90px' });
+    const info = el('div', { class: 'mono', style: 'background:var(--field);border:1px solid var(--line);padding:10px;line-height:1.7' });
+    const ratio = pic ? pic.h / pic.w : m.h / m.w;
+    const show = () => {
+      const sq = st.mode === 'squares';
+      wIn.value = sq ? Math.round(st.w / st.g * 100) / 100 : st.w; hIn.value = sq ? Math.round(st.h / st.g * 100) / 100 : st.h;
+      wIn.step = hIn.step = sq ? '0.5' : '1'; unit.textContent = sq ? 'squares' : 'pixels';
+      modeBtns.forEach(b => b.classList.toggle('primary', b.dataset.m === st.mode));
+      info.textContent = 'Map: ' + Math.round(st.w) + ' × ' + Math.round(st.h) + ' pixels\n' +
+        'Grid: ' + st.g + ' px per square → ' + (Math.round(st.w / st.g * 10) / 10) + ' × ' + (Math.round(st.h / st.g * 10) / 10) + ' squares\n' +
+        'In the game: ' + Math.round(st.w / st.g * 2) + ' × ' + Math.round(st.h / st.g * 2) + ' metres (2 m per square)' +
+        (pic ? '\nPicture: ' + pic.w + ' × ' + pic.h + ' px' + (Math.round(st.w) !== pic.w || Math.round(st.h) !== pic.h ? ' (stretched to fit)' : ' (actual size)') : '');
+    };
+    const readWH = (which) => {
+      const sq = st.mode === 'squares', k = sq ? st.g : 1;
+      let w = Number(wIn.value) * k, h = Number(hIn.value) * k;
+      if (st.lock) { if (which === 'w') h = w * ratio; else w = h / ratio; }
+      st.w = Math.max(100, Math.min(16000, w)); st.h = Math.max(100, Math.min(16000, h)); show();
+    };
+    wIn.onchange = () => readWH('w'); hIn.onchange = () => readWH('h');
+    gIn.onchange = () => { const old = st.g; st.g = Math.max(10, Math.min(400, Number(gIn.value) || 70)); gIn.value = st.g;
+      if (st.mode === 'squares') { st.w = Math.min(16000, st.w / old * st.g); st.h = Math.min(16000, st.h / old * st.g); } show(); };
+    lock.onchange = () => { st.lock = lock.checked; if (st.lock) { st.h = st.w * ratio; show(); } };
+    const modeBtns = ['squares', 'pixels'].map(k => el('button', { class: 'small', 'data-m': k, text: k === 'squares' ? 'In squares' : 'In pixels', onclick: () => { st.mode = k; show(); } }));
+    const preset = n => el('button', { class: 'small ghost', text: n + ' px', onclick: () => { gIn.value = n; gIn.onchange(); } });
+    const apply = () => {
+      const sx = st.w / m.w, sy = st.h / m.h;
+      request({ type: 'map.update', id: m.id, patch: { w: Math.round(st.w), h: Math.round(st.h), grid: { size: st.g } } });
+      if (moveT.checked && (Math.abs(sx - 1) > 0.001 || Math.abs(sy - 1) > 0.001))
+        for (const t of Object.values(m.tokens)) request({ type: 'token.update', mapId: m.id, id: t.id, patch: { x: Math.round(t.x * sx), y: Math.round(t.y * sy) } });
+      closeModal(); toast('Map is now ' + Math.round(st.w) + ' × ' + Math.round(st.h) + ' px, ' + (Math.round(st.w / st.g * 10) / 10) + ' × ' + (Math.round(st.h / st.g * 10) / 10) + ' squares');
+      setTimeout(() => { fitView(true); draw(); }, 100);
+    };
+    dlg.append(
+      el('div', { class: 'section-h', text: 'Grid square' }),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, gIn, el('span', { class: 'dim', text: 'pixels per square' }), el('div', { class: 'grow' }), preset(50), preset(70), preset(100), preset(140)),
+      el('div', { class: 'dim', style: 'font-size:.8rem', text: 'Roll20 uses 70 px per square. Bigger squares mean bigger tokens.' }),
+      el('div', { class: 'section-h', text: 'Map size' }),
+      el('div', { class: 'row', style: 'margin-bottom:6px' }, ...modeBtns),
+      el('div', { class: 'row', style: 'flex-wrap:wrap' }, el('label', { text: 'Width' }), wIn, el('label', { text: 'Height' }), hIn, unit),
+      el('label', { class: 'row', style: 'margin-top:6px' }, lock, m.img ? 'Keep the picture\'s shape' : 'Keep the shape'),
+      pic ? el('div', { class: 'row', style: 'flex-wrap:wrap;margin-top:6px' },
+        el('button', { class: 'small', text: 'Picture\'s real size', onclick: () => { st.w = Math.min(16000, pic.w); st.h = Math.min(16000, pic.h); show(); } }),
+        el('span', { class: 'dim', text: 'Picture already has a grid? It is' }), across, el('span', { class: 'dim', text: 'squares across' }),
+        el('button', { class: 'small primary', text: 'Match it', onclick: () => { const n = Number(across.value); if (!n) return toast('Type how many squares across the picture is', true); st.g = Math.max(10, Math.min(400, Math.round(st.w / n * 100) / 100)); gIn.value = st.g; show(); } })) : null,
+      el('label', { class: 'row', style: 'margin-top:8px' }, moveT, 'Move tokens with the map when it changes size'),
+      info,
+      el('div', { class: 'row', style: 'margin-top:12px' }, el('div', { class: 'grow' }), el('button', { class: 'ghost', text: 'Cancel', onclick: closeModal }), el('button', { class: 'primary', style: 'padding:10px 22px', text: '✓ Apply', onclick: apply })));
+    show();
+  }

@@ -782,7 +782,8 @@
       el('label', { class: 'row' }, el('input', { type: 'checkbox', checked: m.grid.show, onchange: e => up({ grid: { show: e.target.checked } }) }), 'Show grid',
         el('input', { type: 'color', value: m.grid.color || TH.p, title: 'Grid colour', onchange: e => up({ grid: { color: e.target.value } }), style: 'width:40px;height:26px;padding:0;margin-left:auto' }),
         el('input', { type: 'range', min: 0.05, max: 1, step: 0.05, value: m.grid.alpha, onchange: e => up({ grid: { alpha: Number(e.target.value) } }), title: 'Grid opacity' })),
-      m.img ? null : el('div', { class: 'row' }, num('Width (squares)', Math.round(m.w / m.grid.size), 2, 200, v => up({ w: v * m.grid.size })), num('Height', Math.round(m.h / m.grid.size), 2, 200, v => up({ h: v * m.grid.size }))),
+      el('div', { class: 'row' }, el('span', { class: 'grow mono', style: 'font-size:.8rem', text: m.w + ' × ' + m.h + ' px · ' + (Math.round(m.w / m.grid.size * 10) / 10) + ' × ' + (Math.round(m.h / m.grid.size * 10) / 10) + ' squares' }),
+        el('button', { class: 'small pink', text: '📐 Map size…', title: 'Set the map size in pixels or squares, and the grid size (like Roll20)', onclick: () => openMapSize(m) })),
       el('label', { class: 'row' }, el('span', { class: 'grow', text: 'Background colour' }), el('input', { type: 'color', value: m.bg || '#0b0f1a', onchange: e => up({ bg: e.target.value }), style: 'width:40px;height:26px;padding:0' })));
     box.append(el('div', { class: 'section-h', text: 'ADD A TOKEN (NPC, ENEMY, OBJECT)' }));
     const tn = el('input', { class: 'grow', placeholder: 'Name, e.g. Booster #1' });
